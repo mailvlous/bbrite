@@ -1,0 +1,81 @@
+---
+const { draft = null, post = null } = Astro.props;
+const record = draft || post || { id: crypto.randomUUID(), title: '', slug: '', content: '', metadata: {}, github_sha: null };
+const isPublished = Boolean(post);
+---
+<div class="app-shell" data-writer data-id={record.id} data-published={isPublished} data-sha={record.github_sha || post?.sha || ''} data-content={record.content}>
+  <header class="topbar"><a class="brand" href="/">BBRITE</a><span class="status" data-status>Ready</span></header>
+  <main class="writer">
+    <section class="metadata">
+      <input class="title-input" data-title placeholder="Untitled note" value={record.title} maxlength="200" autofocus />
+      <input class="field" data-slug placeholder="slug" value={record.slug} maxlength="80" />
+      <input class="field" data-tags placeholder="tags, comma separated" value={Array.isArray(record.metadata?.tags) ? record.metadata.tags.join(', ') : ''} />
+      <input class="field" data-date type="date" value={String(record.metadata?.date || '').slice(0, 10)} />
+    </section>
+    <nav class="format-toolbar" aria-label="Markdown formatting">
+      <button class="format-button" data-format="bold" aria-label="Bold" title="Bold">B</button>
+      <button class="format-button italic" data-format="italic" aria-label="Italic" title="Italic">I</button>
+      <button class="format-button" data-format="quote" aria-label="Blockquote" title="Blockquote">❝</button>
+      <button class="format-button" data-format="link" aria-label="Link" title="Link">↗</button>
+      <button class="format-button" data-format="code" aria-label="Inline code" title="Inline code">&lt;/&gt;</button>
+      <button class="format-button" data-format="codeblock" aria-label="Code block" title="Code block">{ }</button>
+      <button class="format-button" data-format="ul" aria-label="Bulleted list" title="Bulleted list">☷</button>
+      <button class="format-button" data-format="ol" aria-label="Numbered list" title="Numbered list">☷</button>
+      <button class="format-button" data-format="strike" aria-label="Strikethrough" title="Strikethrough">S</button>
+      <button class="format-button" data-format="task" aria-label="Task list" title="Task list">☑</button>
+      <button class="format-button" data-format="math" aria-label="Math" title="Math">Σ</button>
+    </nav>
+    <section class="editor-grid" data-layout="split">
+      <div class="editor-pane" data-editor-pane><div class="pane-label">Markdown</div><div class="cm-wrap" data-editor></div></div>
+      <div class="editor-pane" data-preview-pane><div class="pane-label">Preview</div><article class="preview" data-preview></article></div>
+    </section>
+    <footer class="toolbar"><div class="toolbar-group"><button class="button" data-command="layout">Split</button><a class="button" href="/posts">Posts</a><a class="button" href="/drafts">Drafts</a></div><div class="toolbar-group"><button class="button" data-command="focus">Focus</button><button class="button" data-command="export">Export</button><button class="button primary" data-command="publish">{isPublished ? 'Publish Changes' : 'Publish'}</button></div></footer>
+  </main>
+  <div class="palette" data-palette hidden><div class="palette-box"><input data-command-search placeholder="Search commands" /><button class="command" data-action="new">New Post</button><button class="command" data-action="posts">Open Posts</button><button class="command" data-action="drafts">Open Drafts</button><button class="command" data-action="save">Save</button><button class="command" data-action="preview">Preview</button><button class="command" data-action="publish">Publish</button><button class="command" data-action="focus">Focus Mode</button></div></div>
+</div>
+<script>
+  import { EditorState } from '@codemirror/state';
+  import { EditorView, keymap } from '@codemirror/view';
+  import { defaultKeymap, indentWithTab } from '@codemirror/commands';
+  import { markdown } from '@codemirror/lang-markdown';
+  import { oneDark } from '@codemirror/theme-one-dark';
+  import { marked } from 'marked';
+  import DOMPurify from 'dompurify';
+
+  const root = document.querySelector<HTMLElement>('[data-writer]');
+  if (root) {
+    const writerRoot = root;
+    const id = writerRoot.dataset.id || crypto.randomUUID(); const published = writerRoot.dataset.published === 'true';
+    const title = writerRoot.querySelector<HTMLInputElement>('[data-title]')!; const slug = writerRoot.querySelector<HTMLInputElement>('[data-slug]')!; const tags = writerRoot.querySelector<HTMLInputElement>('[data-tags]')!; const date = writerRoot.querySelector<HTMLInputElement>('[data-date]')!; const status = writerRoot.querySelector<HTMLElement>('[data-status]')!; const preview = writerRoot.querySelector<HTMLElement>('[data-preview]')!;
+    let content = writerRoot.dataset.content || ''; let timer: ReturnType<typeof setTimeout>; let layout: 'split' | 'editor' | 'preview' = 'split';
+    const editor = new EditorView({ state: EditorState.create({ doc: content, extensions: [markdown(), oneDark, keymap.of([...defaultKeymap, indentWithTab]), EditorView.updateListener.of(update => { if (update.docChanged) { content = update.state.doc.toString(); render(); queueSave(); } })] }), parent: writerRoot.querySelector('[data-editor]')! });
+    function metadata() { return { title: title.value, tags: tags.value.split(',').map(t => t.trim()).filter(Boolean), ...(date.value ? { date: date.value } : {}) }; }
+    function render() { preview.innerHTML = DOMPurify.sanitize(marked.parse(content, { gfm: true, breaks: true }) as string); }
+    function setStatus(value: string, error = false) { status.textContent = value; status.style.color = error ? 'var(--danger)' : ''; }
+    async function save() { clearTimeout(timer); localStorage.setItem('bbrite:'+id, JSON.stringify({ title:title.value, slug:slug.value, content, metadata:metadata() })); setStatus('Saving...'); try { const response = await fetch('/api/drafts/'+id, { method:'PUT', headers:{'content-type':'application/json'}, body:JSON.stringify({ id, title:title.value, slug:slug.value, content, metadata:metadata(), github_path:published ? 'content/'+slug.value+'.md' : null, github_sha: published ? writerRoot.dataset.sha : null }) }); if (!response.ok) throw new Error(); setStatus('Saved'); } catch { setStatus('Offline — saved locally', true); } }
+    function queueSave() { clearTimeout(timer); timer = setTimeout(save, 1300); }
+    function format(kind: string) {
+      const selection = editor.state.selection.main;
+      const selected = editor.state.sliceDoc(selection.from, selection.to);
+      const defaults: Record<string, [string, string, string]> = {
+        bold: ['**', '**', 'bold text'], italic: ['*', '*', 'italic text'], code: ['`', '`', 'code'], strike: ['~~', '~~', 'deleted text'],
+        link: ['[', '](https://)', 'link text'], math: ['$', '$', 'x^2'], codeblock: ['```\n', '\n```', 'code'],
+      };
+      if (defaults[kind]) {
+        const [before, after, fallback] = defaults[kind];
+        editor.dispatch({ changes: { from: selection.from, to: selection.to, insert: before + (selected || fallback) + after }, selection: { anchor: selection.from + before.length, head: selection.from + before.length + (selected || fallback).length } });
+        editor.focus(); return;
+      }
+      const prefix: Record<string, string> = { quote: '> ', ul: '- ', ol: '1. ', task: '- [ ] ' };
+      const line = selected || 'list item';
+      const insert = line.split('\n').map((item, index) => `${kind === 'ol' ? `${index + 1}. ` : prefix[kind]}${item}`).join('\n');
+      editor.dispatch({ changes: { from: selection.from, to: selection.to, insert } }); editor.focus();
+    }
+    async function publish() { await save(); const endpoint = published ? '/api/posts/'+encodeURIComponent(slug.value) : '/api/posts'; const response = await fetch(endpoint, { method: published ? 'PUT' : 'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({ title:title.value, slug:slug.value, content, metadata:metadata(), sha:writerRoot.dataset.sha }) }); const data = await response.json(); if (!response.ok) { setStatus(data.error || 'Could not publish post.', true); return; } writerRoot.dataset.sha = data.sha || ''; setStatus('Published'); }
+    function exportMarkdown() { const lines = ['---', `title: ${title.value}`, 'draft: false', 'tags:', ...metadata().tags.map(t => `  - ${t}`), ...(date.value ? [`date: ${date.value}`] : []), '---', '', content, '']; const blob = new Blob([lines.join('\\n')], {type:'text/markdown'}); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = (slug.value || 'untitled')+'.md'; link.click(); URL.revokeObjectURL(link.href); }
+    function setLayout(next: 'split' | 'editor' | 'preview') { layout = next; writerRoot.querySelector<HTMLElement>('[data-layout]')!.className = 'editor-grid '+(next === 'editor' ? 'editor-only' : next === 'preview' ? 'preview-only' : ''); writerRoot.querySelector<HTMLElement>('[data-command="layout"]')!.textContent = next === 'split' ? 'Editor' : next === 'editor' ? 'Preview' : 'Split'; writerRoot.querySelector<HTMLElement>('[data-editor-pane]')!.hidden = next === 'preview'; writerRoot.querySelector<HTMLElement>('[data-preview-pane]')!.hidden = next === 'editor'; }
+    function command(action: string) { if (action === 'publish') publish(); else if (action === 'save') save(); else if (action === 'export') exportMarkdown(); else if (action === 'focus') document.body.classList.toggle('focus-mode'); else if (action === 'preview') setLayout(layout === 'preview' ? 'split' : 'preview'); else if (action === 'new') location.href='/new'; else if (action === 'posts' || action === 'drafts') location.href='/'+action; }
+    writerRoot.addEventListener('click', event => { const target = event.target as HTMLElement; const formatKind = target.dataset.format; const action = target.dataset.command || target.dataset.action; if (formatKind) format(formatKind); else if (action === 'layout') setLayout(layout === 'split' ? 'editor' : layout === 'editor' ? 'preview' : 'split'); else if (action) command(action); });
+    [title, slug, tags, date].forEach(input => input?.addEventListener('input', queueSave)); window.addEventListener('blur', save); window.addEventListener('pagehide', save); document.addEventListener('keydown', event => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); save(); } if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); publish(); } if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'p') { event.preventDefault(); const palette = writerRoot.querySelector('[data-palette]') as HTMLElement; palette.hidden = !palette.hidden; if (!palette.hidden) (palette.querySelector('input') as HTMLInputElement).focus(); } if (event.key === 'Escape') { (writerRoot.querySelector('[data-palette]') as HTMLElement).hidden = true; document.body.classList.remove('focus-mode'); } }); render();
+  }
+</script>

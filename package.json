@@ -1,0 +1,28 @@
+{
+  "name": "bbrite",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "check": "astro check"
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "^14.2.5",
+    "@codemirror/lang-markdown": "^6.5.2",
+    "@codemirror/commands": "^6.8.1",
+    "@codemirror/state": "^6.5.2",
+    "@codemirror/theme-one-dark": "^6.1.2",
+    "@codemirror/view": "^6.36.5",
+    "astro": "^7.2.9",
+    "dompurify": "^3.4.14",
+    "marked": "^18.0.11"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "@types/node": "^25.0.10",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.61.1"
+  }
+}

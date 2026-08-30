@@ -1,0 +1,8 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Writer from '../../components/Writer.astro';
+import { getPost } from '../../lib/github';
+const env = Astro.locals.runtime.env;
+const post = await getPost(env, Astro.params.slug!);
+---
+<Layout title={post.title}><Writer post={post} /></Layout>
