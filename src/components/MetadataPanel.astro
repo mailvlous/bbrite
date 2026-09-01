@@ -1,0 +1,207 @@
+---
+export interface Props {
+  title?: string;
+  slug?: string;
+  tags?: string[];
+  onUpdate?: (data: any) => void;
+}
+
+const { title = "", slug = "", tags = [] } = Astro.props;
+---
+
+<div class="metadata-panel" id="metadata-panel">
+  <div class="metadata-header">
+    <h3>Post Metadata</h3>
+    <button class="close-btn" id="close-metadata" title="Close">×</button>
+  </div>
+
+  <div class="metadata-body">
+    <div class="metadata-field">
+      <label for="meta-title">Title</label>
+      <input
+        type="text"
+        id="meta-title"
+        class="meta-input"
+        value={title}
+        placeholder="Your post title"
+      />
+    </div>
+
+    <div class="metadata-field">
+      <label for="meta-slug">Slug</label>
+      <input
+        type="text"
+        id="meta-slug"
+        class="meta-input"
+        value={slug}
+        placeholder="auto-generated-from-title"
+      />
+      <small>URL-friendly identifier</small>
+    </div>
+
+    <div class="metadata-field">
+      <label for="meta-tags">Tags</label>
+      <input
+        type="text"
+        id="meta-tags"
+        class="meta-input"
+        value={tags.join(", ")}
+        placeholder="tag1, tag2, tag3"
+      />
+      <small>Comma-separated tags</small>
+    </div>
+
+    <div class="metadata-actions">
+      <button id="save-metadata" class="btn-primary">Save Metadata</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const panel = document.getElementById("metadata-panel");
+  const closeBtn = document.getElementById("close-metadata");
+  const saveBtn = document.getElementById("save-metadata");
+
+  closeBtn?.addEventListener("click", () => {
+    panel?.classList.remove("active");
+  });
+
+  saveBtn?.addEventListener("click", () => {
+    const title = (document.getElementById("meta-title") as HTMLInputElement)?.value;
+    const slug = (document.getElementById("meta-slug") as HTMLInputElement)?.value;
+    const tagsInput = (document.getElementById("meta-tags") as HTMLInputElement)?.value;
+
+    const tags = tagsInput
+      .split(",")
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0);
+
+    window.dispatchEvent(
+      new CustomEvent("metadata-updated", {
+        detail: { title, slug, tags },
+      })
+    );
+
+    panel?.classList.remove("active");
+  });
+</script>
+
+<style>
+  .metadata-panel {
+    position: fixed;
+    right: -400px;
+    top: 80px;
+    width: 380px;
+    height: calc(100vh - 80px);
+    background: var(--surface);
+    border-left: 2px solid var(--border);
+    overflow-y: auto;
+    transition: right 300ms ease;
+    z-index: 100;
+  }
+
+  .metadata-panel.active {
+    right: 0;
+  }
+
+  .metadata-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 2px solid var(--border);
+  }
+
+  .metadata-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+  }
+
+  .close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--foreground);
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .close-btn:hover {
+    background: var(--surface-strong);
+    border-radius: 6px;
+  }
+
+  .metadata-body {
+    padding: 1.5rem;
+  }
+
+  .metadata-field {
+    margin-bottom: 1.5rem;
+  }
+
+  .metadata-field label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    color: var(--foreground);
+  }
+
+  .meta-input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--border);
+    border-radius: 6px;
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+    transition: all 200ms ease;
+  }
+
+  .meta-input:focus {
+    outline: none;
+    border-color: var(--accent-1);
+    box-shadow: 0 0 0 3px rgba(40, 75, 99, 0.1);
+  }
+
+  .metadata-field small {
+    display: block;
+    color: var(--gray);
+    font-size: 0.8rem;
+    margin-top: 0.4rem;
+  }
+
+  .metadata-actions {
+    padding-top: 1rem;
+    border-top: 2px solid var(--border);
+  }
+
+  .btn-primary {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: var(--accent-1);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 200ms ease;
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(40, 75, 99, 0.3);
+  }
+
+  @media (max-width: 768px) {
+    .metadata-panel {
+      width: 100%;
+      right: -100%;
+    }
+  }
+</style>

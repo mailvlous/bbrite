@@ -1,7 +1,142 @@
 ---
+<<<<<<< HEAD
 import Layout from '../layouts/Layout.astro';
 import { getDrafts } from '../lib/database';
 import type { Draft } from '../lib/database';
 const drafts = await getDrafts(Astro.locals.runtime.env.DB);
 ---
 <Layout title="Drafts"><main class="page"><p class="brand">BBRITE / WORKSPACE</p><h1>Drafts</h1><section class="list">{drafts.length ? drafts.map((draft: Draft) => <a class="list-item" href={`/draft/${draft.id}`}><span>{draft.title || 'Untitled note'}</span><small>{new Date(draft.updated_at).toLocaleString()}</small></a>) : <p class="empty">No drafts yet.</p>}</section></main></Layout>
+=======
+import Layout from "../layouts/Layout.astro";
+import Card from "../components/Card.astro";
+
+const pageTitle = "Drafts";
+
+const draftsResponse = await fetch(new URL("/api/drafts", Astro.request.url));
+const drafts = draftsResponse.ok ? await draftsResponse.json() : [];
+---
+
+<Layout title={pageTitle} currentPage="drafts">
+  <div class="drafts-header">
+    <h1>Your Drafts</h1>
+    <a href="/new" class="new-draft-btn">+ New Draft</a>
+  </div>
+
+  {drafts.length > 0 ? (
+    <div class="drafts-grid" id="drafts-grid">
+      {drafts.map((draft) => (
+        <div class="draft-item" data-search={(`${draft.title || "Untitled"} ${draft.metadata?.tags?.join(" ") || ""}`).toLowerCase()}>
+          <Card
+            title={draft.title || "Untitled"}
+            excerpt={draft.content?.slice(0, 180) || "No content yet."}
+            tags={draft.metadata?.tags || []}
+            date={draft.updated_at ? new Date(draft.updated_at).toISOString() : undefined}
+            href={`/drafts/${draft.id}`}
+            isEditable={true}
+          />
+        </div>
+      ))}
+    </div>
+  ) : (
+    <div class="empty-state">
+      <p>No drafts yet.</p>
+      <a href="/new" class="empty-cta">Create your first draft</a>
+    </div>
+  )}
+</Layout>
+
+<script>
+  const searchInput = document.getElementById("draft-search");
+  const items = Array.from(document.querySelectorAll(".draft-item"));
+
+  if (searchInput) {
+    searchInput.addEventListener("input", (event) => {
+      const query = (event.target).value.trim().toLowerCase();
+
+      items.forEach((item) => {
+        const haystack = (item.getAttribute("data-search") || "").toLowerCase();
+        const matches = !query || haystack.includes(query);
+        item.style.display = matches ? "" : "none";
+      });
+    });
+  }
+</script>
+
+<style>
+  .drafts-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 2.5rem;
+    margin-bottom: 3.5rem;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+  }
+
+  .drafts-header h1 {
+    font-size: 2rem;
+    flex: 1;
+    min-width: 250px;
+  }
+
+  .new-draft-btn {
+    background: var(--accent-1);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all var(--transition-standard);
+  }
+
+  .new-draft-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(40, 75, 99, 0.3);
+  }
+
+  .drafts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 2.5rem;
+  }
+
+  .empty-state {
+    text-align: center;
+    min-height: 280px;
+    padding: 5rem 2rem;
+    background: var(--surface-strong);
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    color: var(--darkgray);
+  }
+
+  .empty-state p {
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+  }
+
+  .empty-cta {
+    display: inline-block;
+    background: var(--accent-1);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    text-decoration: none;
+  }
+
+  @media (max-width: 768px) {
+    .drafts-header {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .drafts-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .new-draft-btn {
+      text-align: center;
+    }
+  }
+</style>
+>>>>>>> 60b1fc0 (change ui)

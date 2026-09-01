@@ -1,0 +1,225 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import MarkdownToolbar from "../../components/MarkdownToolbar.astro";
+
+const { slug } = Astro.params;
+const postResponse = await fetch(new URL(`/api/posts/${slug ?? ""}`, Astro.request.url));
+const post = postResponse.ok ? await postResponse.json() : null;
+const pageTitle = post?.title || "Edit Post";
+---
+
+<Layout title={pageTitle} currentPage="posts">
+  <div class="editor-container">
+    <div class="editor-header">
+      <input
+        type="text"
+        id="post-title"
+        class="title-input"
+        value={post?.title || "Untitled"}
+        placeholder="Untitled"
+        autofocus
+      />
+      <div class="editor-status">
+        <span id="save-status" class="save-status">Saved</span>
+        <button id="publish-btn" class="publish-btn">Update</button>
+      </div>
+    </div>
+
+    <div class="editor-toolbar">
+      <button id="btn-edit" class="toolbar-btn active" data-mode="edit">Edit</button>
+      <button id="btn-split" class="toolbar-btn" data-mode="split">Split</button>
+      <button id="btn-preview" class="toolbar-btn" data-mode="preview">Preview</button>
+      <button id="btn-focus" class="toolbar-btn" title="Focus mode">Focus</button>
+    </div>
+    <MarkdownToolbar />
+
+    <div class="editor-area">
+      <textarea id="editor-content" class="editor-textarea" placeholder="Start writing in Markdown...">{post?.content || ""}</textarea>
+      <div id="preview-pane" class="preview-pane">
+        <div id="preview-content" class="preview-content"></div>
+      </div>
+    </div>
+
+    <div class="editor-metadata">
+      <div class="metadata-group">
+        <label for="post-slug">Slug</label>
+        <input type="text" id="post-slug" class="metadata-input" value={post?.slug || ""} />
+      </div>
+
+      <div class="metadata-group">
+        <label for="post-tags">Tags</label>
+        <input type="text" id="post-tags" class="metadata-input" value={(post?.frontmatter?.tags || []).join(", ")} />
+      </div>
+
+      <div class="metadata-actions">
+        <button id="btn-export" class="secondary-btn">Export Markdown</button>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<script define:vars={{ slugValue: slug }}>
+  const titleInput = document.getElementById("post-title");
+  const contentArea = document.getElementById("editor-content");
+  const previewPane = document.getElementById("preview-pane");
+  const previewContent = document.getElementById("preview-content");
+  const saveStatus = document.getElementById("save-status");
+  const slugInput = document.getElementById("post-slug");
+  const tagsInput = document.getElementById("post-tags");
+  const btnEdit = document.getElementById("btn-edit");
+  const btnSplit = document.getElementById("btn-split");
+  const btnPreview = document.getElementById("btn-preview");
+  const btnFocus = document.getElementById("btn-focus");
+  const btnExport = document.getElementById("btn-export");
+  const publishBtn = document.getElementById("publish-btn");
+
+  let currentMode = "edit";
+  let focusMode = false;
+
+  const slugify = (value) => value.toLowerCase().trim().replace(/[^\w\s-]/g, "").replace(/[\s_-]+/g, "-").replace(/^-+|-+$/g, "") || "untitled";
+  const parseTags = (value) => value.split(",").map((tag) => tag.trim()).filter(Boolean);
+
+  async function updatePreview() {
+    const markdown = contentArea.value || "";
+    previewContent.innerHTML = "<p>Rendering preview…</p>";
+
+    try {
+      const response = await fetch("/api/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: markdown }),
+      });
+
+      if (!response.ok) throw new Error("Preview failed");
+      const data = await response.json();
+      previewContent.innerHTML = data.html || "<p>Nothing to preview yet.</p>";
+    } catch (error) {
+      previewContent.innerHTML = "<p>Preview unavailable right now.</p>";
+    }
+  }
+
+  function setEditorMode(mode) {
+    currentMode = mode;
+    [btnEdit, btnSplit, btnPreview].forEach((button) => button.classList.remove("active"));
+
+    if (mode === "edit") {
+      btnEdit.classList.add("active");
+      contentArea.style.display = "block";
+      previewPane.style.display = "none";
+    } else if (mode === "split") {
+      btnSplit.classList.add("active");
+      contentArea.style.display = "block";
+      previewPane.style.display = "block";
+    } else {
+      btnPreview.classList.add("active");
+      contentArea.style.display = "none";
+      previewPane.style.display = "block";
+    }
+
+    updatePreview();
+  }
+
+  function exportMarkdown() {
+    const element = document.createElement("a");
+    element.setAttribute("href", `data:text/plain;charset=utf-8,${encodeURIComponent(contentArea.value)}`);
+    element.setAttribute("download", `${slugify(titleInput.value || "untitled")}.md`);
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  }
+
+  async function updatePost() {
+    const nextSlug = slugInput.value.trim() || slugify(titleInput.value || "Untitled");
+
+    saveStatus.textContent = "Updating...";
+    saveStatus.classList.add("saving");
+
+    try {
+      const response = await fetch(`/api/posts/${encodeURIComponent(slugValue)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content: contentArea.value,
+          frontmatter: {
+            title: titleInput.value.trim() || "Untitled",
+            draft: false,
+            tags: parseTags(tagsInput.value || ""),
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error || "Update failed");
+      }
+
+      saveStatus.textContent = "Updated";
+      saveStatus.classList.remove("saving");
+      window.location.href = "/posts";
+    } catch (error) {
+      saveStatus.textContent = "Update error";
+      saveStatus.classList.add("error");
+      if (window.showToast) window.showToast(error.message || "Could not update post", "error");
+    }
+  }
+
+  titleInput.addEventListener("input", () => {
+    if (!slugInput.value.trim()) slugInput.value = slugify(titleInput.value || "Untitled");
+    updatePreview();
+  });
+
+  contentArea.addEventListener("input", updatePreview);
+  btnEdit.addEventListener("click", () => setEditorMode("edit"));
+  btnSplit.addEventListener("click", () => setEditorMode("split"));
+  btnPreview.addEventListener("click", () => setEditorMode("preview"));
+  btnFocus.addEventListener("click", () => {
+    focusMode = !focusMode;
+    document.body.classList.toggle("focus-mode", focusMode);
+    btnFocus.classList.toggle("active", focusMode);
+  });
+  btnExport.addEventListener("click", exportMarkdown);
+  publishBtn.addEventListener("click", updatePost);
+  document.addEventListener("keydown", (event) => {
+    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+      event.preventDefault();
+      updatePost();
+    }
+    if (event.key === "Escape" && focusMode) {
+      focusMode = false;
+      document.body.classList.remove("focus-mode");
+      btnFocus.classList.remove("active");
+    }
+  });
+
+  setEditorMode("edit");
+  updatePreview();
+</script>
+
+<style>
+  .editor-layout { max-width: 100%; }
+  .editor-container { display: flex; flex-direction: column; height: 100vh; gap: 0; margin: -2rem; padding-top: 80px; }
+  .editor-header { display: flex; justify-content: space-between; align-items: center; padding: 1.5rem 2rem; background: var(--surface); border-bottom: 2px solid var(--border); gap: 2rem; flex-wrap: wrap; }
+  .title-input { flex: 1; min-width: 200px; font-size: 1.75rem; font-family: var(--font-display); font-weight: 600; border: none; background: transparent; color: var(--foreground); padding: 0; }
+  .title-input:focus { outline: none; }
+  .editor-status { display: flex; align-items: center; gap: 1rem; }
+  .save-status { font-size: 0.9rem; color: var(--gray); font-family: var(--font-mono); }
+  .save-status.saving { color: var(--accent-1); }
+  .save-status.error { color: var(--accent-2); }
+  .publish-btn { background: var(--accent-1); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; cursor: pointer; }
+  .editor-toolbar { display: flex; gap: 1rem; padding: 1rem 2rem; background: var(--surface); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .toolbar-btn { padding: 0.5rem 1rem; border: 1px solid var(--border); background: transparent; color: var(--foreground); border-radius: 6px; cursor: pointer; font-weight: 500; }
+  .toolbar-btn.active { background: var(--accent-1); color: white; border-color: var(--accent-1); }
+  .editor-area { display: flex; flex: 1; overflow: hidden; }
+  .editor-textarea { flex: 1; padding: 2rem; border: none; background: var(--background); color: var(--foreground); font-family: var(--font-mono); font-size: 1rem; line-height: 1.6; resize: none; overflow-y: auto; }
+  .editor-textarea:focus { outline: none; }
+  .preview-pane { flex: 1; padding: 2rem; background: var(--surface); border-left: 2px solid var(--border); overflow-y: auto; display: none; }
+  .preview-content { max-width: 65ch; }
+  .editor-metadata { padding: 1.5rem 2rem; background: var(--surface); border-top: 2px solid var(--border); display: none; }
+  .metadata-group { margin-bottom: 1rem; }
+  .metadata-group label { display: block; font-weight: 500; margin-bottom: 0.5rem; }
+  .metadata-input { width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 6px; background: var(--background); color: var(--foreground); }
+  .metadata-actions { display: flex; gap: 1rem; margin-top: 1.5rem; }
+  .secondary-btn { padding: 0.6rem 1.2rem; border: 1px solid var(--border); background: var(--surface-strong); color: var(--foreground); border-radius: 6px; cursor: pointer; }
+  body.focus-mode .editor-header, body.focus-mode .editor-toolbar { display: none; }
+  @media (max-width: 768px) { .editor-header { flex-direction: column; align-items: stretch; padding: 1rem; } .title-input { font-size: 1.5rem; } .editor-status { justify-content: space-between; } .editor-textarea, .preview-pane { padding: 1rem; } .publish-btn { width: 100%; } }
+</style>

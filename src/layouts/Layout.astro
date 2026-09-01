@@ -1,5 +1,262 @@
 ---
+<<<<<<< HEAD
 import '../styles/global.css';
 const { title = 'Bbrite' } = Astro.props;
 ---
 <!doctype html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width" /><title>{title} · Bbrite</title></head><body><slot /></body></html>
+=======
+import BriteHeader from "../components/BriteHeader.astro";
+import Toast from "../components/Toast.astro";
+
+export interface Props {
+  title: string;
+  currentPage?: string;
+  class?: string;
+}
+
+const { title, currentPage, class: className } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>{title} · Bbrite</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=DM+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style is:global>
+      :root {
+        --background: #ffd447;
+        --foreground: #050505;
+        --surface: #fff4a3;
+        --surface-strong: #ff9f1c;
+        --border: #050505;
+        --gray: #625b94;
+        --darkgray: #171717;
+        --lightgray: #fff4a3;
+
+        --accent-1: #ff0088;
+        --accent-2: #ff9f1c;
+        --accent-3: #fff4a3;
+        --accent-4: #6757a5;
+
+        /* Typography */
+        --font-display: "Bowlby One", Impact, sans-serif;
+        --font-body: "DM Sans", "Segoe UI", sans-serif;
+        --font-mono: "IBM Plex Mono", monospace;
+
+        /* Spacing scale */
+        --space-xs: 0.25rem;
+        --space-sm: 0.5rem;
+        --space-md: 1rem;
+        --space-lg: 1.5rem;
+        --space-xl: 2rem;
+        --space-2xl: 3rem;
+
+        /* Transitions */
+        --transition-fast: 150ms ease;
+        --transition-standard: 200ms ease;
+        --transition-smooth: 300ms ease-out;
+      }
+
+      :root[data-theme="dark"] {
+        --background: #171525;
+        --foreground: #fff8d6;
+        --surface: #25203b;
+        --surface-strong: #3b315c;
+        --border: #fff8d6;
+        --gray: #c5bce7;
+        --darkgray: #f0e9c9;
+        --lightgray: #3b315c;
+        --accent-1: #ff4aaa;
+        --accent-2: #ff9f1c;
+        --accent-3: #fff4a3;
+        --accent-4: #b7a8ff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        font-family: var(--font-body);
+        background: var(--background);
+        color: var(--foreground);
+      }
+
+      body {
+        margin: 0;
+        padding: 0;
+        line-height: 1.6;
+        background: var(--background);
+      }
+
+      h1,
+      h2,
+      h3,
+      h4,
+      h5,
+      h6 {
+        font-family: var(--font-display);
+        font-weight: 400;
+        line-height: 0.92;
+        letter-spacing: 0;
+        margin: 0;
+      }
+
+      h1 { font-size: 3.25rem; }
+      h2 { font-size: 2.25rem; }
+      h3 { font-size: 1.65rem; }
+
+      p {
+        margin: 0;
+      }
+
+      a {
+        color: var(--accent-1);
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      code {
+        font-family: var(--font-mono);
+        background: var(--surface-strong);
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.9em;
+      }
+
+      pre {
+        background: var(--surface-strong);
+        padding: 1rem;
+        border-radius: 8px;
+        overflow-x: auto;
+        border: 1px solid var(--border);
+      }
+
+      pre code {
+        background: none;
+        padding: 0;
+        border-radius: 0;
+      }
+
+      blockquote {
+        border-left: 4px solid var(--accent-2);
+        padding-left: 1rem;
+        margin-left: 0;
+        color: var(--darkgray);
+        font-style: italic;
+      }
+
+      button,
+      input,
+      textarea,
+      select {
+        font-family: var(--font-body);
+        font-size: 1rem;
+      }
+
+      button {
+        cursor: pointer;
+        transition: all var(--transition-standard);
+      }
+
+      button:hover {
+        opacity: 0.9;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <BriteHeader currentPage={currentPage} />
+    <Toast />
+
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to dark mode" title="Switch theme">
+      <span aria-hidden="true">☾</span>
+    </button>
+
+    <main class:list={["main-content", className]}>
+      <slot />
+    </main>
+
+    <style is:global>
+      .theme-toggle {
+        position: fixed;
+        right: 1.25rem;
+        bottom: 1.25rem;
+        z-index: 40;
+        width: 3rem;
+        height: 3rem;
+        border: 2px solid var(--border);
+        border-radius: 50%;
+        background: var(--surface);
+        color: var(--foreground);
+        font-size: 1.35rem;
+        line-height: 1;
+        box-shadow: 3px 3px 0 var(--foreground);
+      }
+
+      .theme-toggle:hover {
+        background: var(--accent-2);
+        color: var(--foreground);
+        opacity: 1;
+        transform: translate(-1px, -1px);
+      }
+
+      [data-theme="dark"] .theme-toggle {
+        box-shadow: 3px 3px 0 var(--accent-1);
+      }
+
+      .main-content {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 2rem 4rem 2rem;
+      }
+
+      @media (max-width: 768px) {
+        .main-content {
+          padding: 0 1rem 2rem 1rem;
+        }
+      }
+    </style>
+  </body>
+</html>
+
+<script>
+  const themeKey = "bbrite-theme";
+  const themeToggle = document.getElementById("theme-toggle");
+  const themeIcon = themeToggle?.querySelector("span");
+
+  function applyTheme(theme) {
+    document.documentElement.dataset.theme = theme;
+    const dark = theme === "dark";
+    if (themeIcon) themeIcon.textContent = dark ? "☀" : "☾";
+    themeToggle?.setAttribute("aria-label", dark ? "Switch to light mode" : "Switch to dark mode");
+  }
+
+  const savedTheme = localStorage.getItem(themeKey);
+  const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  applyTheme(savedTheme === "dark" || savedTheme === "light" ? savedTheme : systemTheme);
+
+  themeToggle?.addEventListener("click", () => {
+    const nextTheme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    localStorage.setItem(themeKey, nextTheme);
+    applyTheme(nextTheme);
+  });
+</script>
+>>>>>>> 60b1fc0 (change ui)

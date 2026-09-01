@@ -1,0 +1,211 @@
+---
+export type ToastType = "success" | "error" | "info" | "warning";
+
+export interface Props {
+  duration?: number;
+}
+
+const { duration = 3000 } = Astro.props;
+---
+
+<div class="toast-container" id="toast-container"></div>
+
+<script define:vars={{ duration }}>
+  export function showToast(message: string, type: string = "info") {
+    const container = document.getElementById("toast-container");
+    if (!container) return;
+
+    const toast = document.createElement("div");
+    toast.className = `toast toast-${type}`;
+    toast.setAttribute("role", "alert");
+    toast.setAttribute("aria-live", "polite");
+
+    const content = document.createElement("div");
+    content.className = "toast-content";
+    content.textContent = message;
+
+    const closeBtn = document.createElement("button");
+    closeBtn.className = "toast-close";
+    closeBtn.textContent = "×";
+    closeBtn.setAttribute("aria-label", "Close notification");
+
+    toast.appendChild(content);
+    toast.appendChild(closeBtn);
+
+    closeBtn.addEventListener("click", () => {
+      toast.classList.add("hiding");
+      setTimeout(() => toast.remove(), 300);
+    });
+
+    container.appendChild(toast);
+
+    // Auto remove
+    if (duration > 0) {
+      setTimeout(() => {
+        if (toast.parentElement) {
+          toast.classList.add("hiding");
+          setTimeout(() => toast.remove(), 300);
+        }
+      }, duration);
+    }
+  }
+
+  // Global notification system
+  window.showToast = showToast;
+
+  // Listen for save events
+  window.addEventListener("draft-saved", () => {
+    showToast("Draft saved", "success");
+  });
+
+  window.addEventListener("draft-save-error", (e: any) => {
+    showToast(e.detail?.message || "Failed to save", "error");
+  });
+
+  window.addEventListener("published", () => {
+    showToast("Post published!", "success");
+  });
+
+  window.addEventListener("publish-error", (e: any) => {
+    showToast(e.detail?.message || "Failed to publish", "error");
+  });
+</script>
+
+<style>
+  .toast-container {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    pointer-events: none;
+  }
+
+  .toast {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    min-width: 300px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    pointer-events: all;
+    animation: slideIn 300ms ease-out;
+  }
+
+  .toast.hiding {
+    animation: slideOut 300ms ease-out forwards;
+  }
+
+  @keyframes slideIn {
+    from {
+      transform: translateX(400px);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideOut {
+    from {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    to {
+      transform: translateX(400px);
+      opacity: 0;
+    }
+  }
+
+  .toast.toast-success {
+    background: linear-gradient(135deg, #84a59d 0%, #84a59d 100%);
+    color: white;
+    border-color: #6b8e87;
+  }
+
+  .toast.toast-success::before {
+    content: "✓";
+    font-weight: bold;
+    font-size: 1.25rem;
+  }
+
+  .toast.toast-error {
+    background: linear-gradient(135deg, #d4745f 0%, #d4745f 100%);
+    color: white;
+    border-color: #c25a47;
+  }
+
+  .toast.toast-error::before {
+    content: "✕";
+    font-weight: bold;
+    font-size: 1.25rem;
+  }
+
+  .toast.toast-warning {
+    background: linear-gradient(135deg, #f0ad4e 0%, #f0ad4e 100%);
+    color: white;
+    border-color: #d89b3b;
+  }
+
+  .toast.toast-warning::before {
+    content: "⚠";
+    font-weight: bold;
+    font-size: 1.25rem;
+  }
+
+  .toast.toast-info {
+    background: linear-gradient(135deg, #284b63 0%, #284b63 100%);
+    color: white;
+    border-color: #1a2d3d;
+  }
+
+  .toast.toast-info::before {
+    content: "ℹ";
+    font-weight: bold;
+    font-size: 1.25rem;
+  }
+
+  .toast-content {
+    flex: 1;
+    font-weight: 500;
+  }
+
+  .toast-close {
+    background: none;
+    border: none;
+    color: inherit;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.8;
+    transition: opacity 200ms ease;
+  }
+
+  .toast-close:hover {
+    opacity: 1;
+  }
+
+  @media (max-width: 768px) {
+    .toast-container {
+      bottom: 1rem;
+      right: 1rem;
+      left: 1rem;
+    }
+
+    .toast {
+      min-width: unset;
+      width: 100%;
+    }
+  }
+</style>

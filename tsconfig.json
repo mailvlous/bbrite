@@ -1,8 +1,18 @@
 {
   "extends": "astro/tsconfigs/strict",
   "compilerOptions": {
+<<<<<<< HEAD
     "allowJs": true,
     "baseUrl": ".",
     "paths": { "@/*": ["src/*"] }
+=======
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "moduleResolution": "bundler",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+>>>>>>> 60b1fc0 (change ui)
   }
 }

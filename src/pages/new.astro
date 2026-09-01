@@ -1,5 +1,619 @@
 ---
+<<<<<<< HEAD
 import Layout from '../layouts/Layout.astro';
 import Writer from '../components/Writer.astro';
 ---
 <Layout title="New Post"><Writer /></Layout>
+=======
+import Layout from "../layouts/Layout.astro";
+import MarkdownToolbar from "../components/MarkdownToolbar.astro";
+
+const pageTitle = "New Post";
+---
+
+<Layout title={pageTitle} class="editor-layout">
+  <div class="editor-container">
+    <div class="editor-header">
+      <input
+        type="text"
+        id="post-title"
+        placeholder="Untitled"
+        class="title-input"
+        autofocus
+      />
+      <div class="editor-status">
+        <span id="save-status" class="save-status">Saved</span>
+        <button id="publish-btn" class="publish-btn">Publish</button>
+      </div>
+    </div>
+
+    <div class="editor-toolbar">
+      <button id="btn-preview" class="toolbar-btn active" data-mode="edit">
+        Edit
+      </button>
+      <button id="btn-split" class="toolbar-btn" data-mode="split">Split</button>
+      <button id="btn-preview-only" class="toolbar-btn" data-mode="preview">
+        Preview
+      </button>
+      <button id="btn-focus" class="toolbar-btn" title="Focus mode (Cmd+Shift+Ctrl+F)">
+        Focus
+      </button>
+    </div>
+    <MarkdownToolbar />
+
+    <div class="editor-area">
+      <textarea
+        id="editor-content"
+        class="editor-textarea"
+        placeholder="Start writing in Markdown...
+# Heading
+
+Your content here."
+      ></textarea>
+
+      <div id="preview-pane" class="preview-pane">
+        <div id="preview-content" class="preview-content"></div>
+      </div>
+    </div>
+
+    <div class="editor-metadata">
+      <div class="metadata-group">
+        <label for="post-slug">Slug</label>
+        <input
+          type="text"
+          id="post-slug"
+          placeholder="auto-generated"
+          class="metadata-input"
+        />
+      </div>
+
+      <div class="metadata-group">
+        <label for="post-tags">Tags</label>
+        <input
+          type="text"
+          id="post-tags"
+          placeholder="tag1, tag2, tag3"
+          class="metadata-input"
+        />
+      </div>
+
+      <div class="metadata-actions">
+        <button id="btn-export" class="secondary-btn">Export Markdown</button>
+        <button id="btn-discard" class="secondary-btn danger">Discard</button>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  const titleInput = document.getElementById("post-title");
+  const contentArea = document.getElementById("editor-content");
+  const previewPane = document.getElementById("preview-pane");
+  const previewContent = document.getElementById("preview-content");
+  const saveStatus = document.getElementById("save-status");
+  const slugInput = document.getElementById("post-slug");
+  const tagsInput = document.getElementById("post-tags");
+
+  const btnEdit = document.getElementById("btn-preview");
+  const btnSplit = document.getElementById("btn-split");
+  const btnPreviewOnly = document.getElementById("btn-preview-only");
+  const btnFocus = document.getElementById("btn-focus");
+  const btnExport = document.getElementById("btn-export");
+  const btnDiscard = document.getElementById("btn-discard");
+  const publishBtn = document.getElementById("publish-btn");
+
+  let currentMode = "edit";
+  let focusMode = false;
+  let autoSaveTimeout = null;
+  let draftId = localStorage.getItem("bbrite-draft-id") || "";
+
+  const notify = (message, type = "info") => {
+    if (window.showToast) {
+      window.showToast(message, type);
+      return;
+    }
+    alert(message);
+  };
+
+  const slugify = (value) => {
+    return value
+      .toLowerCase()
+      .trim()
+      .replace(/[^\w\s-]/g, "")
+      .replace(/[\s_-]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "untitled";
+  };
+
+  const parseTags = (value) => {
+    return value
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+  };
+
+  async function updatePreview() {
+    const markdown = contentArea.value || "";
+    previewContent.innerHTML = "<p>Rendering preview…</p>";
+
+    try {
+      const html = await fetch("/api/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: markdown }),
+      }).then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Preview failed");
+        }
+        const data = await response.json();
+        return data.html || "";
+      });
+
+      previewContent.innerHTML = html || "<p>Nothing to preview yet.</p>";
+    } catch (error) {
+      previewContent.innerHTML = "<p>Preview unavailable right now.</p>";
+    }
+  }
+
+  function setEditorMode(mode) {
+    currentMode = mode;
+    [btnEdit, btnSplit, btnPreviewOnly].forEach((btn) => btn.classList.remove("active"));
+
+    if (mode === "edit") {
+      btnEdit.classList.add("active");
+      contentArea.style.display = "block";
+      previewPane.style.display = "none";
+    } else if (mode === "split") {
+      btnSplit.classList.add("active");
+      contentArea.style.display = "block";
+      previewPane.style.display = "block";
+    } else if (mode === "preview") {
+      btnPreviewOnly.classList.add("active");
+      contentArea.style.display = "none";
+      previewPane.style.display = "block";
+    }
+
+    updatePreview();
+  }
+
+  async function saveCurrentDraft() {
+    const trimmedTitle = titleInput.value.trim();
+    const slugValue = (slugInput.value || slugify(trimmedTitle || "Untitled")).trim();
+    const draftBody = {
+      id: draftId || undefined,
+      title: trimmedTitle || "Untitled",
+      slug: slugValue,
+      content: contentArea.value,
+      metadata: {
+        tags: parseTags(tagsInput.value || ""),
+      },
+      status: "draft",
+    };
+
+    saveStatus.textContent = "Saving...";
+    saveStatus.classList.add("saving");
+    saveStatus.classList.remove("error");
+
+    try {
+      const response = await fetch(draftId ? `/api/drafts/${draftId}` : "/api/drafts", {
+        method: draftId ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draftBody),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error || "Draft save failed");
+      }
+
+      const saved = await response.json();
+      if (saved.id) {
+        draftId = saved.id;
+        localStorage.setItem("bbrite-draft-id", saved.id);
+      }
+
+      saveStatus.textContent = "Saved";
+      saveStatus.classList.remove("saving");
+      notify("Draft saved", "success");
+      window.dispatchEvent(new CustomEvent("draft-saved"));
+    } catch (error) {
+      saveStatus.textContent = "Error saving";
+      saveStatus.classList.add("error");
+      saveStatus.classList.remove("saving");
+      notify(error.message || "Could not save draft", "error");
+      window.dispatchEvent(new CustomEvent("draft-save-error", {
+        detail: { message: error.message || "Could not save draft" },
+      }));
+    }
+  }
+
+  function triggerAutoSave() {
+    if (autoSaveTimeout) {
+      clearTimeout(autoSaveTimeout);
+    }
+
+    autoSaveTimeout = setTimeout(() => {
+      saveCurrentDraft();
+    }, 1200);
+  }
+
+  function toggleFocusMode() {
+    focusMode = !focusMode;
+    document.body.classList.toggle("focus-mode", focusMode);
+    btnFocus.classList.toggle("active", focusMode);
+  }
+
+  function exportMarkdown() {
+    const content = contentArea.value;
+    const title = titleInput.value || "untitled";
+    const element = document.createElement("a");
+    element.setAttribute(
+      "href",
+      `data:text/plain;charset=utf-8,${encodeURIComponent(content)}`
+    );
+    element.setAttribute("download", `${slugify(title)}.md`);
+    element.style.display = "none";
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  }
+
+  async function publishCurrentDraft() {
+    const slugValue = (slugInput.value || slugify(titleInput.value || "Untitled")).trim();
+    const titleValue = titleInput.value.trim() || "Untitled";
+    const tagsValue = parseTags(tagsInput.value || "");
+
+    try {
+      saveStatus.textContent = "Publishing...";
+      saveStatus.classList.add("saving");
+
+      if (!draftId) {
+        await saveCurrentDraft();
+      }
+
+      const response = await fetch(`/api/posts/${encodeURIComponent(slugValue)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content: contentArea.value,
+          frontmatter: {
+            title: titleValue,
+            draft: false,
+            tags: tagsValue,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error || "Publish failed");
+      }
+
+      saveStatus.textContent = "Published";
+      saveStatus.classList.remove("saving");
+      notify("Post published", "success");
+      window.dispatchEvent(new CustomEvent("published"));
+      window.location.href = "/posts";
+    } catch (error) {
+      saveStatus.textContent = "Publish error";
+      saveStatus.classList.add("error");
+      saveStatus.classList.remove("saving");
+      notify(error.message || "Publish failed", "error");
+      window.dispatchEvent(new CustomEvent("publish-error", {
+        detail: { message: error.message || "Publish failed" },
+      }));
+    }
+  }
+
+  function attachEvents() {
+    contentArea.addEventListener("input", () => {
+      updatePreview();
+      triggerAutoSave();
+    });
+
+    titleInput.addEventListener("input", () => {
+      if (!slugInput.value.trim()) {
+        slugInput.value = slugify(titleInput.value || "Untitled");
+      }
+      triggerAutoSave();
+    });
+
+    slugInput.addEventListener("input", () => triggerAutoSave());
+    tagsInput.addEventListener("input", () => triggerAutoSave());
+
+    btnEdit.addEventListener("click", () => setEditorMode("edit"));
+    btnSplit.addEventListener("click", () => setEditorMode("split"));
+    btnPreviewOnly.addEventListener("click", () => setEditorMode("preview"));
+    btnFocus.addEventListener("click", toggleFocusMode);
+    btnExport.addEventListener("click", exportMarkdown);
+
+    btnDiscard.addEventListener("click", () => {
+      if (confirm("Discard this draft? This cannot be undone.")) {
+        localStorage.removeItem("bbrite-draft-id");
+        window.location.href = "/drafts";
+      }
+    });
+
+    publishBtn.addEventListener("click", () => publishCurrentDraft());
+
+    document.addEventListener("keydown", (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === "p") {
+        event.preventDefault();
+        setEditorMode(currentMode === "edit" ? "preview" : "edit");
+      }
+
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        triggerAutoSave();
+      }
+
+      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+        event.preventDefault();
+        publishCurrentDraft();
+      }
+
+      if (event.key === "Escape" && focusMode) {
+        toggleFocusMode();
+      }
+    });
+  }
+
+  attachEvents();
+  setEditorMode("edit");
+  updatePreview();
+</script>
+
+<style>
+  .editor-layout {
+    max-width: 100%;
+  }
+
+  .editor-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    gap: 0;
+    margin: -2rem;
+    padding-top: 80px;
+  }
+
+  .editor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 2rem;
+    background: var(--surface);
+    border-bottom: 2px solid var(--border);
+    gap: 2rem;
+    flex-wrap: wrap;
+  }
+
+  .title-input {
+    flex: 1;
+    min-width: 200px;
+    font-size: 1.75rem;
+    font-family: var(--font-display);
+    font-weight: 600;
+    border: none;
+    background: transparent;
+    color: var(--foreground);
+    padding: 0;
+  }
+
+  .title-input:focus {
+    outline: none;
+  }
+
+  .editor-status {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .save-status {
+    font-size: 0.9rem;
+    color: var(--gray);
+    font-family: var(--font-mono);
+  }
+
+  .save-status.saving {
+    color: var(--accent-1);
+  }
+
+  .save-status.error {
+    color: var(--accent-2);
+  }
+
+  .publish-btn {
+    background: var(--accent-1);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-standard);
+  }
+
+  .publish-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(40, 75, 99, 0.3);
+  }
+
+  .editor-toolbar {
+    display: flex;
+    gap: 1rem;
+    padding: 1rem 2rem;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+
+  .toolbar-btn {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--foreground);
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all var(--transition-fast);
+  }
+
+  .toolbar-btn:hover {
+    border-color: var(--accent-1);
+    color: var(--accent-1);
+  }
+
+  .toolbar-btn.active {
+    background: var(--accent-1);
+    color: white;
+    border-color: var(--accent-1);
+  }
+
+  .editor-area {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .editor-textarea {
+    flex: 1;
+    padding: 2rem;
+    border: none;
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    line-height: 1.6;
+    resize: none;
+    overflow-y: auto;
+  }
+
+  .editor-textarea:focus {
+    outline: none;
+  }
+
+  .preview-pane {
+    flex: 1;
+    padding: 2rem;
+    background: var(--surface);
+    border-left: 2px solid var(--border);
+    overflow-y: auto;
+    display: none;
+  }
+
+  .preview-content {
+    max-width: 65ch;
+  }
+
+  .preview-content :global(h1, h2, h3, h4, h5, h6) {
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .preview-content :global(p) {
+    margin-bottom: 1rem;
+    line-height: 1.7;
+  }
+
+  .editor-metadata {
+    padding: 1.5rem 2rem;
+    background: var(--surface);
+    border-top: 2px solid var(--border);
+    display: none;
+  }
+
+  .metadata-group {
+    margin-bottom: 1rem;
+  }
+
+  .metadata-group label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+  }
+
+  .metadata-input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-body);
+  }
+
+  .metadata-input:focus {
+    outline: none;
+    border-color: var(--accent-1);
+  }
+
+  .metadata-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+
+  .secondary-btn {
+    padding: 0.6rem 1.2rem;
+    border: 1px solid var(--border);
+    background: var(--surface-strong);
+    color: var(--foreground);
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all var(--transition-fast);
+  }
+
+  .secondary-btn:hover {
+    border-color: var(--accent-1);
+  }
+
+  .secondary-btn.danger:hover {
+    background: rgba(212, 116, 95, 0.1);
+    border-color: var(--accent-2);
+    color: var(--accent-2);
+  }
+
+  :global(body.focus-mode) .editor-header,
+  :global(body.focus-mode) .editor-toolbar {
+    display: none;
+  }
+
+  :global(body.focus-mode) .editor-container {
+    padding-top: 0;
+  }
+
+  @media (max-width: 1024px) {
+    .preview-pane {
+      flex: 0 0 40%;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .editor-header {
+      flex-direction: column;
+      align-items: stretch;
+      padding: 1rem;
+    }
+
+    .title-input {
+      font-size: 1.5rem;
+    }
+
+    .editor-status {
+      justify-content: space-between;
+    }
+
+    .editor-textarea,
+    .preview-pane {
+      padding: 1rem;
+    }
+
+    .publish-btn {
+      width: 100%;
+    }
+  }
+</style>
+>>>>>>> 60b1fc0 (change ui)

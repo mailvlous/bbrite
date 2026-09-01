@@ -1,6 +1,136 @@
 ---
+<<<<<<< HEAD
 import Layout from '../layouts/Layout.astro';
 import { listPosts } from '../lib/github';
 const posts = await listPosts(Astro.locals.runtime.env);
 ---
 <Layout title="Posts"><main class="page"><p class="brand">BBRITE / GARDEN</p><h1>Posts</h1><input class="search" placeholder="Search posts..." data-search /><section class="list">{posts.map(post => <a class="list-item" href={`/edit/${post.slug}`} data-item><span>{post.title}</span><small>{post.path}</small></a>)}</section></main><script>const search = document.querySelector('[data-search]'); search?.addEventListener('input', () => document.querySelectorAll('[data-item]').forEach(item => (item as HTMLElement).hidden = !item.textContent?.toLowerCase().includes((search as HTMLInputElement).value.toLowerCase())));</script></Layout>
+=======
+import Layout from "../layouts/Layout.astro";
+import Card from "../components/Card.astro";
+
+const pageTitle = "Posts";
+
+const postsResponse = await fetch(new URL("/api/posts", Astro.request.url));
+const posts = postsResponse.ok ? await postsResponse.json() : [];
+---
+
+<Layout title={pageTitle} currentPage="posts">
+  <div class="posts-header">
+    <h1>Published Posts</h1>
+    <input
+      type="search"
+      id="search-posts"
+      placeholder="Search posts..."
+      class="search-input"
+    />
+  </div>
+
+  {posts.length > 0 ? (
+    <div class="posts-grid" id="posts-grid">
+      {posts.map((post) => (
+        <div class="post-item" data-search={(`${post.title || ""} ${post.frontmatter?.tags?.join(" ") || ""}`).toLowerCase()}>
+          <Card
+            title={post.title}
+            excerpt={post.excerpt || post.content?.slice(0, 180)}
+            tags={post.frontmatter?.tags || []}
+            date={post.frontmatter?.date || post.updated_at}
+            href={`/posts/${post.slug}`}
+          />
+        </div>
+      ))}
+    </div>
+  ) : (
+    <div class="empty-state">
+      <p>No published posts yet.</p>
+      <a href="/new">Create your first post</a>
+    </div>
+  )}
+</Layout>
+
+<script>
+  const searchInput = document.getElementById("search-posts");
+  const items = Array.from(document.querySelectorAll(".post-item"));
+
+  if (searchInput) {
+    searchInput.addEventListener("input", (event) => {
+      const query = (event.target).value.trim().toLowerCase();
+
+      items.forEach((item) => {
+        const haystack = (item.getAttribute("data-search") || "").toLowerCase();
+        const matches = !query || haystack.includes(query);
+        item.style.display = matches ? "" : "none";
+      });
+    });
+  }
+</script>
+
+<style>
+  .posts-header {
+    margin-top: 2.5rem;
+    margin-bottom: 3.5rem;
+  }
+
+  .posts-header h1 {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+  }
+
+  .search-input {
+    width: 100%;
+    max-width: 400px;
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    font-size: 1rem;
+    background: var(--surface);
+    color: var(--foreground);
+  }
+
+  .search-input:focus {
+    outline: none;
+    border-color: var(--accent-1);
+  }
+
+  .posts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 2.5rem;
+    margin-top: 0;
+  }
+
+  .empty-state {
+    text-align: center;
+    min-height: 280px;
+    padding: 5rem 2rem;
+    background: var(--surface-strong);
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    color: var(--darkgray);
+  }
+
+  .empty-state p {
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+  }
+
+  .empty-state a {
+    display: inline-block;
+    background: var(--accent-1);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    text-decoration: none;
+  }
+
+  @media (max-width: 768px) {
+    .search-input {
+      max-width: 100%;
+    }
+
+    .posts-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+>>>>>>> 60b1fc0 (change ui)

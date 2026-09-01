@@ -1,0 +1,235 @@
+---
+export interface Props {
+  draftId?: string;
+  slug?: string;
+  isPublished?: boolean;
+}
+
+const { draftId, slug, isPublished = false } = Astro.props;
+const pageTitle = isPublished ? `Edit: ${slug}` : "Edit Draft";
+---
+
+<div class="command-palette" id="command-palette">
+  <div class="command-palette-content">
+    <input
+      type="text"
+      id="command-input"
+      class="command-input"
+      placeholder="Type a command... (Cmd+Shift+P)"
+      autocomplete="off"
+    />
+    <ul id="command-list" class="command-list"></ul>
+  </div>
+</div>
+
+<script is:inline define:vars={{ draftId, slug, isPublished }}>
+  const COMMANDS = [
+    {
+      id: "save",
+      title: "Save Draft",
+      description: "Save your work",
+      shortcut: "Cmd+S",
+      action: () => window.dispatchEvent(new Event("save-draft")),
+    },
+    {
+      id: "publish",
+      title: "Publish",
+      description: "Publish to GitHub",
+      shortcut: "Cmd+Enter",
+      action: () => window.dispatchEvent(new Event("publish")),
+    },
+    {
+      id: "preview",
+      title: "Preview",
+      description: "Switch to preview mode",
+      shortcut: "Cmd+Shift+P",
+      action: () => window.dispatchEvent(new Event("toggle-preview")),
+    },
+    {
+      id: "focus",
+      title: "Focus Mode",
+      description: "Enter distraction-free mode",
+      action: () => window.dispatchEvent(new Event("toggle-focus")),
+    },
+    {
+      id: "delete",
+      title: isPublished ? "Delete Post" : "Delete Draft",
+      description: "Delete this " + (isPublished ? "post" : "draft"),
+      action: () => window.dispatchEvent(new Event("delete")),
+    },
+  ];
+
+  const palette = document.getElementById("command-palette");
+  const input = document.getElementById("command-input");
+  const list = document.getElementById("command-list");
+
+  function showPalette() {
+    palette.classList.add("active");
+    input.focus();
+    renderCommands(COMMANDS);
+  }
+
+  function hidePalette() {
+    palette.classList.remove("active");
+    input.value = "";
+  }
+
+  function renderCommands(commands) {
+    list.innerHTML = commands
+      .map(
+        (cmd) => `
+      <li class="command-item" data-id="${cmd.id}">
+        <div class="command-info">
+          <div class="command-title">${cmd.title}</div>
+          <div class="command-description">${cmd.description}</div>
+        </div>
+        <div class="command-shortcut">${cmd.shortcut || ""}</div>
+      </li>
+    `
+      )
+      .join("");
+
+    // Attach click handlers
+    document.querySelectorAll(".command-item").forEach((item) => {
+      item.addEventListener("click", () => {
+        const id = item.dataset.id;
+        const cmd = commands.find((c) => c.id === id);
+        if (cmd) {
+          cmd.action();
+          hidePalette();
+        }
+      });
+    });
+  }
+
+  function filterCommands(query) {
+    const filtered = COMMANDS.filter(
+      (cmd) =>
+        cmd.title.toLowerCase().includes(query.toLowerCase()) ||
+        cmd.description.toLowerCase().includes(query.toLowerCase())
+    );
+    renderCommands(filtered);
+  }
+
+  // Event listeners
+  document.addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "p") {
+      e.preventDefault();
+      showPalette();
+    }
+    if (e.key === "Escape") {
+      hidePalette();
+    }
+  });
+
+  input.addEventListener("input", (e) => {
+    filterCommands((e.target as HTMLInputElement).value);
+  });
+
+  // Click outside to close
+  palette.addEventListener("click", (e) => {
+    if ((e.target as HTMLElement) === palette) {
+      hidePalette();
+    }
+  });
+</script>
+
+<style>
+  .command-palette {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    z-index: 1000;
+    padding-top: 100px;
+  }
+
+  .command-palette.active {
+    display: flex;
+  }
+
+  .command-palette-content {
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    width: 100%;
+    max-width: 600px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  }
+
+  .command-input {
+    width: 100%;
+    padding: 1rem;
+    border: none;
+    background: var(--surface);
+    color: var(--foreground);
+    font-size: 1rem;
+    font-family: var(--font-body);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .command-input:focus {
+    outline: none;
+  }
+
+  .command-list {
+    list-style: none;
+    margin: 0;
+    padding: 0.5rem 0;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+
+  .command-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    transition: background 200ms ease;
+  }
+
+  .command-item:hover {
+    background: var(--surface-strong);
+  }
+
+  .command-info {
+    flex: 1;
+  }
+
+  .command-title {
+    font-weight: 500;
+    color: var(--foreground);
+  }
+
+  .command-description {
+    font-size: 0.85rem;
+    color: var(--gray);
+  }
+
+  .command-shortcut {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--gray);
+    background: var(--surface-strong);
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    margin-left: 1rem;
+  }
+
+  @media (max-width: 768px) {
+    .command-palette {
+      padding-top: 50px;
+    }
+
+    .command-palette-content {
+      max-width: 90%;
+    }
+  }
+</style>

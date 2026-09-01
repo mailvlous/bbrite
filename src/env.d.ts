@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /// <reference types="astro/client" />
 
 type D1Database = import('@cloudflare/workers-types').D1Database;
@@ -14,3 +15,6 @@ declare namespace App {
     runtime: { env: Env };
   }
 }
+=======
+/// <reference path="../.astro/types.d.ts" />
+>>>>>>> 60b1fc0 (change ui)
