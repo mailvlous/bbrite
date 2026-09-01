@@ -1,12 +1,3 @@
----
-<<<<<<< HEAD
-import Layout from '../layouts/Layout.astro';
-import { getDrafts } from '../lib/database';
-import type { Draft } from '../lib/database';
-const drafts = await getDrafts(Astro.locals.runtime.env.DB);
----
-<Layout title="Drafts"><main class="page"><p class="brand">BBRITE / WORKSPACE</p><h1>Drafts</h1><section class="list">{drafts.length ? drafts.map((draft: Draft) => <a class="list-item" href={`/draft/${draft.id}`}><span>{draft.title || 'Untitled note'}</span><small>{new Date(draft.updated_at).toLocaleString()}</small></a>) : <p class="empty">No drafts yet.</p>}</section></main></Layout>
-=======
 import Layout from "../layouts/Layout.astro";
 import Card from "../components/Card.astro";
 
@@ -139,4 +130,3 @@ const drafts = draftsResponse.ok ? await draftsResponse.json() : [];
     }
   }
 </style>
->>>>>>> 60b1fc0 (change ui)

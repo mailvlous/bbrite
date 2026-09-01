@@ -1,11 +1,3 @@
----
-<<<<<<< HEAD
-import Layout from '../layouts/Layout.astro';
-import { listPosts } from '../lib/github';
-const posts = await listPosts(Astro.locals.runtime.env);
----
-<Layout title="Posts"><main class="page"><p class="brand">BBRITE / GARDEN</p><h1>Posts</h1><input class="search" placeholder="Search posts..." data-search /><section class="list">{posts.map(post => <a class="list-item" href={`/edit/${post.slug}`} data-item><span>{post.title}</span><small>{post.path}</small></a>)}</section></main><script>const search = document.querySelector('[data-search]'); search?.addEventListener('input', () => document.querySelectorAll('[data-item]').forEach(item => (item as HTMLElement).hidden = !item.textContent?.toLowerCase().includes((search as HTMLInputElement).value.toLowerCase())));</script></Layout>
-=======
 import Layout from "../layouts/Layout.astro";
 import Card from "../components/Card.astro";
 
@@ -133,4 +125,3 @@ const posts = postsResponse.ok ? await postsResponse.json() : [];
     }
   }
 </style>
->>>>>>> 60b1fc0 (change ui)

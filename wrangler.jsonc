@@ -1,10 +1,12 @@
 {
-<<<<<<< HEAD
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "bbrite",
   "compatibility_date": "2026-08-30",
   "compatibility_flags": ["nodejs_compat"],
-  "assets": { "binding": "ASSETS", "directory": "./dist" },
+  "assets": {
+    "binding": "ASSETS",
+    "directory": "./dist"
+  },
   "d1_databases": [
     {
       "binding": "DB",
@@ -16,39 +18,7 @@
   "vars": {
     "GITHUB_OWNER": "mailvlous",
     "GITHUB_REPO": "garden",
-    "GITHUB_BRANCH": "v4"
-=======
-  "name": "bbrite",
-  "main": "src/index.ts",
-  "type": "service-worker",
-  "compatibility_date": "2024-12-12",
-  "env": {
-    "production": {
-      "vars": {
-        "GITHUB_OWNER": "mailvlous",
-        "GITHUB_REPO": "garden",
-        "GITHUB_BRANCH": "v4",
-        "CONTENT_PATH": "content"
-      }
-    }
-  },
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "bbrite_db",
-      "database_id": "YOUR_DATABASE_ID"
-    }
-  ],
-  "env_override": {
-    "preview": {
-      "d1_databases": [
-        {
-          "binding": "DB",
-          "database_name": "bbrite_db_preview",
-          "preview_id": "YOUR_PREVIEW_DATABASE_ID"
-        }
-      ]
-    }
->>>>>>> 60b1fc0 (change ui)
+    "GITHUB_BRANCH": "v4",
+    "CONTENT_PATH": "content"
   }
 }
