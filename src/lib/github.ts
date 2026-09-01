@@ -296,3 +296,39 @@ export function createGitHubAPI(env: any): GitHubAPI {
     token
   );
 }
+
+export async function getPost(env: any, slug: string): Promise<Post | null> {
+  const api = createGitHubAPI(env);
+  return await api.getPost(slug);
+}
+
+export async function listPosts(env: any): Promise<Post[]> {
+  const api = createGitHubAPI(env);
+  return await api.listPosts();
+}
+
+export async function writePost(
+  env: any,
+  slug: string,
+  content: string,
+  message: string
+): Promise<{ content: { sha: string } }> {
+  const api = createGitHubAPI(env);
+  const contentPath = env.CONTENT_PATH || "content";
+  const path = `${contentPath}/${slug}.md`;
+  
+  try {
+    // Try to get the existing file first to check if it exists
+    const existing = await api.getPost(slug);
+    if (existing) {
+      const result = await api.updateFile(path, content, existing.sha, message);
+      return { content: { sha: result.sha } };
+    }
+  } catch {
+    // File doesn't exist, will create it
+  }
+  
+  // Create the file if it doesn't exist
+  const result = await api.createFile(path, content, message);
+  return { content: { sha: result.sha } };
+}

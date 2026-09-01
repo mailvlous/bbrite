@@ -1,13 +1,8 @@
+---
 import BriteHeader from "../components/BriteHeader.astro";
 import Toast from "../components/Toast.astro";
 
-export interface Props {
-  title: string;
-  currentPage?: string;
-  class?: string;
-}
-
-const { title, currentPage, class: className } = Astro.props;
+const { title = "Bbrite", currentPage = "", class: className = "" } = Astro.props;
 ---
 
 <!doctype html>
