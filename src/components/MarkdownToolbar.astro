@@ -13,10 +13,12 @@
 </div>
 
 <script>
-  const toolbar = document.querySelector(".markdown-toolbar");
-  const editor = document.getElementById("editor-content");
+  type Format = { prefix: string; suffix: string; placeholder: string };
 
-  const formats = {
+  const toolbar = document.querySelector<HTMLElement>(".markdown-toolbar");
+  const editor = document.getElementById("editor-content") as HTMLTextAreaElement | null;
+
+  const formats: Record<string, Format> = {
     bold: { prefix: "**", suffix: "**", placeholder: "bold text" },
     italic: { prefix: "*", suffix: "*", placeholder: "italic text" },
     strike: { prefix: "~~", suffix: "~~", placeholder: "struck text" },
@@ -25,7 +27,7 @@
     math: { prefix: "$", suffix: "$", placeholder: "x^2" },
   };
 
-  function replaceSelection(format) {
+  function replaceSelection(format: Format) {
     if (!editor) return;
 
     const start = editor.selectionStart;
@@ -39,7 +41,7 @@
     editor.dispatchEvent(new Event("input", { bubbles: true }));
   }
 
-  function prefixLines(prefix, placeholder) {
+  function prefixLines(prefix: string, placeholder: string) {
     if (!editor) return;
 
     const start = editor.selectionStart;
@@ -63,7 +65,8 @@
   });
 
   toolbar?.addEventListener("click", (event) => {
-    const button = event.target.closest("button");
+    if (!(event.target instanceof Element)) return;
+    const button = event.target.closest<HTMLButtonElement>("button[data-format]");
     if (!button) return;
 
     const formatName = button.dataset.format;
@@ -73,7 +76,7 @@
     if (formatName === "task") return prefixLines("- [ ] ", "task item");
     if (formatName === "code-block") return replaceSelection({ prefix: "```\n", suffix: "\n```", placeholder: "code" });
 
-    const format = formats[formatName];
+    const format = formatName ? formats[formatName] : undefined;
     if (format) replaceSelection(format);
   });
 </script>

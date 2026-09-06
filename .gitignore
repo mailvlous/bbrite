@@ -1,29 +1,25 @@
-<<<<<<< HEAD
+# Dependencies
 node_modules/
+
+# Build and tool outputs
 dist/
+.dist/
 .astro/
 .wrangler/
+.cache/
+tmp/
+
+# Environment files
 .env
 .env.*
 !.env.example
-check-output.txt
-=======
-# Dependencies
-node_modules/
-package-lock.json
-pnpm-lock.yaml
 
-# Build outputs
-dist/
-.astro/
-.vercel/
+# Local Cloudflare and database files
+*.wrangler.toml.local
+db.sqlite3
+*.db
 
-# Environment
-.env
-.env.local
-.env.*.local
-
-# IDE
+# Editor and operating-system files
 .vscode/
 .idea/
 *.swp
@@ -31,21 +27,9 @@ dist/
 *~
 .DS_Store
 
-# Logs
+# Logs and diagnostics
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-
-# Cloudflare
-.wrangler/
-*.wrangler.toml.local
-
-# Database
-db.sqlite3
-*.db
-
-# Temporary
-.cache/
-tmp/
->>>>>>> 60b1fc0 (change ui)
+check-output.txt

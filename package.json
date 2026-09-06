@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
@@ -24,6 +27,7 @@
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^25.0.10",
     "typescript": "^5.9.3",
     "wrangler": "^4.61.1"

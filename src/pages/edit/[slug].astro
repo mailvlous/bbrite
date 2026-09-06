@@ -2,7 +2,11 @@
 import Layout from '../../layouts/Layout.astro';
 import Writer from '../../components/Writer.astro';
 import { getPost } from '../../lib/github';
-const env = Astro.locals.runtime.env;
-const post = await getPost(env, Astro.params.slug!);
+import { getEnv } from '../../lib/runtime';
+const post = await getPost(getEnv(), Astro.params.slug!);
+
+if (!post) {
+  return Astro.redirect('/404');
+}
 ---
 <Layout title={post.title}><Writer post={post} /></Layout>

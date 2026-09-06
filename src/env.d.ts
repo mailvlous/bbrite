@@ -9,10 +9,21 @@ interface Env {
   GITHUB_REPO: string;
   GITHUB_BRANCH: string;
   CONTENT_PATH: string;
+  ACCESS_TEAM_DOMAIN: string;
+  ACCESS_AUD: string;
+  ACCESS_ALLOWED_EMAIL: string;
+}
+
+declare module "cloudflare:workers" {
+  export const env: Env;
 }
 
 declare namespace App {
   interface Locals {
-    runtime: { env: Env };
+    user?: { email: string; sub: string };
   }
+}
+
+interface Window {
+  showToast?: (message: string, type?: "success" | "error" | "info" | "warning") => void;
 }

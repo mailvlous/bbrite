@@ -1,8 +1,10 @@
+---
 import Layout from "../layouts/Layout.astro";
 import MarkdownToolbar from "../components/MarkdownToolbar.astro";
 
 const pageTitle = "New Post";
 ---
+
 
 <Layout title={pageTitle} class="editor-layout">
   <div class="editor-container">
@@ -79,28 +81,28 @@ Your content here."
 </Layout>
 
 <script>
-  const titleInput = document.getElementById("post-title");
-  const contentArea = document.getElementById("editor-content");
-  const previewPane = document.getElementById("preview-pane");
-  const previewContent = document.getElementById("preview-content");
-  const saveStatus = document.getElementById("save-status");
-  const slugInput = document.getElementById("post-slug");
-  const tagsInput = document.getElementById("post-tags");
+  const titleInput = document.getElementById("post-title") as HTMLInputElement;
+  const contentArea = document.getElementById("editor-content") as HTMLTextAreaElement;
+  const previewPane = document.getElementById("preview-pane") as HTMLDivElement;
+  const previewContent = document.getElementById("preview-content") as HTMLDivElement;
+  const saveStatus = document.getElementById("save-status") as HTMLSpanElement;
+  const slugInput = document.getElementById("post-slug") as HTMLInputElement;
+  const tagsInput = document.getElementById("post-tags") as HTMLInputElement;
 
-  const btnEdit = document.getElementById("btn-preview");
-  const btnSplit = document.getElementById("btn-split");
-  const btnPreviewOnly = document.getElementById("btn-preview-only");
-  const btnFocus = document.getElementById("btn-focus");
-  const btnExport = document.getElementById("btn-export");
-  const btnDiscard = document.getElementById("btn-discard");
-  const publishBtn = document.getElementById("publish-btn");
+  const btnEdit = document.getElementById("btn-preview") as HTMLButtonElement;
+  const btnSplit = document.getElementById("btn-split") as HTMLButtonElement;
+  const btnPreviewOnly = document.getElementById("btn-preview-only") as HTMLButtonElement;
+  const btnFocus = document.getElementById("btn-focus") as HTMLButtonElement;
+  const btnExport = document.getElementById("btn-export") as HTMLButtonElement;
+  const btnDiscard = document.getElementById("btn-discard") as HTMLButtonElement;
+  const publishBtn = document.getElementById("publish-btn") as HTMLButtonElement;
 
-  let currentMode = "edit";
+  let currentMode: "edit" | "split" | "preview" = "edit";
   let focusMode = false;
-  let autoSaveTimeout = null;
+  let autoSaveTimeout: ReturnType<typeof setTimeout> | undefined;
   let draftId = localStorage.getItem("bbrite-draft-id") || "";
 
-  const notify = (message, type = "info") => {
+  const notify = (message: string, type: "success" | "error" | "info" | "warning" = "info") => {
     if (window.showToast) {
       window.showToast(message, type);
       return;
@@ -108,7 +110,7 @@ Your content here."
     alert(message);
   };
 
-  const slugify = (value) => {
+  const slugify = (value: string): string => {
     return value
       .toLowerCase()
       .trim()
@@ -117,7 +119,7 @@ Your content here."
       .replace(/^-+|-+$/g, "") || "untitled";
   };
 
-  const parseTags = (value) => {
+  const parseTags = (value: string): string[] => {
     return value
       .split(",")
       .map((tag) => tag.trim())
@@ -147,7 +149,7 @@ Your content here."
     }
   }
 
-  function setEditorMode(mode) {
+  function setEditorMode(mode: "edit" | "split" | "preview") {
     currentMode = mode;
     [btnEdit, btnSplit, btnPreviewOnly].forEach((btn) => btn.classList.remove("active"));
 
@@ -209,12 +211,13 @@ Your content here."
       notify("Draft saved", "success");
       window.dispatchEvent(new CustomEvent("draft-saved"));
     } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not save draft";
       saveStatus.textContent = "Error saving";
       saveStatus.classList.add("error");
       saveStatus.classList.remove("saving");
-      notify(error.message || "Could not save draft", "error");
+      notify(message, "error");
       window.dispatchEvent(new CustomEvent("draft-save-error", {
-        detail: { message: error.message || "Could not save draft" },
+        detail: { message },
       }));
     }
   }
@@ -263,14 +266,14 @@ Your content here."
         await saveCurrentDraft();
       }
 
-      const response = await fetch(`/api/posts/${encodeURIComponent(slugValue)}`, {
-        method: "PUT",
+      const response = await fetch("/api/posts", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          title: titleValue,
+          slug: slugValue,
           content: contentArea.value,
-          frontmatter: {
-            title: titleValue,
-            draft: false,
+          metadata: {
             tags: tagsValue,
           },
         }),
@@ -287,12 +290,13 @@ Your content here."
       window.dispatchEvent(new CustomEvent("published"));
       window.location.href = "/posts";
     } catch (error) {
+      const message = error instanceof Error ? error.message : "Publish failed";
       saveStatus.textContent = "Publish error";
       saveStatus.classList.add("error");
       saveStatus.classList.remove("saving");
-      notify(error.message || "Publish failed", "error");
+      notify(message, "error");
       window.dispatchEvent(new CustomEvent("publish-error", {
-        detail: { message: error.message || "Publish failed" },
+        detail: { message },
       }));
     }
   }

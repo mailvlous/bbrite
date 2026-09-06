@@ -1,9 +1,4 @@
 ---
-import Layout from '../../layouts/Layout.astro';
-import Writer from '../../components/Writer.astro';
-import { getDraft } from '../../lib/database';
-const draft = await getDraft(Astro.locals.runtime.env.DB, Astro.params.id!);
-if (!draft) return Astro.redirect('/drafts');
-const parsed = { ...draft, metadata: JSON.parse(draft.metadata as unknown as string) };
+const id = Astro.params.id;
+return Astro.redirect(id ? `/drafts/${encodeURIComponent(id)}` : "/drafts", 308);
 ---
-<Layout title={draft.title}><Writer draft={parsed} /></Layout>

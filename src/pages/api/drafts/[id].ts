@@ -2,12 +2,15 @@ import type { APIRoute } from "astro";
 import { getDraft, saveDraft, deleteDraft } from "../../../lib/db";
 import type { Draft } from "../../../lib/db";
 import { renderMarkdown } from "../../../lib/markdown";
+import { getEnv } from "../../../lib/runtime";
+import { guardUser, unauthorized } from "../../../lib/access";
 import { validateSlug, validateTitle } from "../../../lib/utils";
 
 export const GET: APIRoute = async ({ params, locals }) => {
+  if (!guardUser(locals)) return unauthorized();
   try {
     const { id } = params;
-    const db = locals.runtime?.env?.DB;
+    const db = getEnv().DB;
 
     if (!db || !id) {
       return new Response(
@@ -48,9 +51,10 @@ export const GET: APIRoute = async ({ params, locals }) => {
 };
 
 export const PUT: APIRoute = async ({ params, request, locals }) => {
+  if (!guardUser(locals)) return unauthorized();
   try {
     const { id } = params;
-    const db = locals.runtime?.env?.DB;
+    const db = getEnv().DB;
 
     if (!db || !id) {
       return new Response(
@@ -109,9 +113,10 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
 };
 
 export const DELETE: APIRoute = async ({ params, locals }) => {
+  if (!guardUser(locals)) return unauthorized();
   try {
     const { id } = params;
-    const db = locals.runtime?.env?.DB;
+    const db = getEnv().DB;
 
     if (!db || !id) {
       return new Response(

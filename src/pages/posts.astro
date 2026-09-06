@@ -1,11 +1,17 @@
+---
 import Layout from "../layouts/Layout.astro";
 import Card from "../components/Card.astro";
+import { listPosts } from "../lib/github";
+import { getEnv } from "../lib/runtime";
 
 const pageTitle = "Posts";
 
-const postsResponse = await fetch(new URL("/api/posts", Astro.request.url));
-const posts = postsResponse.ok ? await postsResponse.json() : [];
+let posts: any[] = [];
+try {
+  posts = await listPosts(getEnv());
+} catch {}
 ---
+
 
 <Layout title={pageTitle} currentPage="posts">
   <div class="posts-header">
@@ -41,12 +47,12 @@ const posts = postsResponse.ok ? await postsResponse.json() : [];
 </Layout>
 
 <script>
-  const searchInput = document.getElementById("search-posts");
-  const items = Array.from(document.querySelectorAll(".post-item"));
+  const searchInput = document.getElementById("search-posts") as HTMLInputElement | null;
+  const items = Array.from(document.querySelectorAll<HTMLElement>(".post-item"));
 
   if (searchInput) {
-    searchInput.addEventListener("input", (event) => {
-      const query = (event.target).value.trim().toLowerCase();
+    searchInput.addEventListener("input", () => {
+      const query = searchInput.value.trim().toLowerCase();
 
       items.forEach((item) => {
         const haystack = (item.getAttribute("data-search") || "").toLowerCase();

@@ -1,2 +1,3 @@
 import type { APIRoute } from 'astro';
-export const GET: APIRoute = () => new Response(JSON.stringify({ ok: true, app: 'bbrite' }), { headers: { 'content-type': 'application/json' } });
+import { guardUser, unauthorized } from '../../lib/access';
+export const GET: APIRoute = ({ locals }) => { if (!guardUser(locals)) return unauthorized(); return new Response(JSON.stringify({ ok: true, app: 'bbrite' }), { headers: { 'content-type': 'application/json' } }); };

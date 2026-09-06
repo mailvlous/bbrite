@@ -8,10 +8,15 @@ export interface Props {
 const { duration = 3000 } = Astro.props;
 ---
 
-<div class="toast-container" id="toast-container"></div>
+<div class="toast-container" id="toast-container" data-duration={duration}></div>
 
-<script define:vars={{ duration }}>
-  export function showToast(message: string, type: string = "info") {
+<script>
+  type ToastKind = "success" | "error" | "info" | "warning";
+
+  const toastContainer = document.getElementById("toast-container");
+  const toastDuration = Number(toastContainer?.dataset.duration || 3000);
+
+  function showToast(message: string, type: ToastKind = "info") {
     const container = document.getElementById("toast-container");
     if (!container) return;
 
@@ -40,13 +45,13 @@ const { duration = 3000 } = Astro.props;
     container.appendChild(toast);
 
     // Auto remove
-    if (duration > 0) {
+    if (toastDuration > 0) {
       setTimeout(() => {
         if (toast.parentElement) {
           toast.classList.add("hiding");
           setTimeout(() => toast.remove(), 300);
         }
-      }, duration);
+      }, toastDuration);
     }
   }
 
@@ -58,16 +63,18 @@ const { duration = 3000 } = Astro.props;
     showToast("Draft saved", "success");
   });
 
-  window.addEventListener("draft-save-error", (e: any) => {
-    showToast(e.detail?.message || "Failed to save", "error");
+  window.addEventListener("draft-save-error", (event) => {
+    const detail = (event as CustomEvent<{ message?: string }>).detail;
+    showToast(detail?.message || "Failed to save", "error");
   });
 
   window.addEventListener("published", () => {
     showToast("Post published!", "success");
   });
 
-  window.addEventListener("publish-error", (e: any) => {
-    showToast(e.detail?.message || "Failed to publish", "error");
+  window.addEventListener("publish-error", (event) => {
+    const detail = (event as CustomEvent<{ message?: string }>).detail;
+    showToast(detail?.message || "Failed to publish", "error");
   });
 </script>
 

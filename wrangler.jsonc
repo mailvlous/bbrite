@@ -1,24 +1,35 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "bbrite",
-  "compatibility_date": "2026-08-30",
-  "compatibility_flags": ["nodejs_compat"],
-  "assets": {
-    "binding": "ASSETS",
-    "directory": "./dist"
-  },
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "bbrite-db",
-      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
-      "migrations_dir": "migrations"
-    }
-  ],
-  "vars": {
-    "GITHUB_OWNER": "mailvlous",
-    "GITHUB_REPO": "garden",
-    "GITHUB_BRANCH": "v4",
-    "CONTENT_PATH": "content"
-  }
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "bbrite",
+	"compatibility_date": "2026-08-30",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"assets": {
+		"binding": "ASSETS",
+		"directory": "./dist"
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "bbrite-db",
+			"database_id": "b0e68bf0-b763-4f32-9830-88e1251c9e0f",
+			"migrations_dir": "migrations"
+		},
+		{
+			"binding": "bbrite_db",
+			"database_name": "bbrite-db",
+			"database_id": "b0e68bf0-b763-4f32-9830-88e1251c9e0f",
+			"remote": true
+		}
+	],
+	"vars": {
+		"GITHUB_OWNER": "mailvlous",
+		"GITHUB_REPO": "garden",
+		"GITHUB_BRANCH": "v4",
+		"CONTENT_PATH": "content",
+		"ACCESS_TEAM_DOMAIN": "REPLACE_WITH_YOU.cloudflareaccess.com",
+		"ACCESS_AUD": "df5aea2169e7c2b7962d4dcd28db2f999524a8484fc193c8fc395fc8d5f1152a",
+		"ACCESS_ALLOWED_EMAIL": "fauzi.ismail.tif424@polban.ac.id"
+	}
 }

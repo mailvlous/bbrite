@@ -1,10 +1,18 @@
 ---
 import Layout from "../../layouts/Layout.astro";
 import MarkdownToolbar from "../../components/MarkdownToolbar.astro";
+import { getDraft } from "../../lib/db";
+import { getEnv } from "../../lib/runtime";
 
 const { id } = Astro.params;
-const draftResponse = await fetch(new URL(`/api/drafts/${id ?? ""}`, Astro.request.url));
-const draft = draftResponse.ok ? await draftResponse.json() : null;
+
+let draft: any = null;
+const env = getEnv();
+if (id && env.DB) {
+  try {
+    draft = await getDraft(env.DB, id);
+  } catch {}
+}
 const pageTitle = draft?.title || "Edit Draft";
 ---
 
@@ -59,7 +67,7 @@ const pageTitle = draft?.title || "Edit Draft";
   </div>
 </Layout>
 
-<script define:vars={{ draftId: id }}>
+<script is:inline define:vars={{ draftId: id }}>
   const titleInput = document.getElementById("post-title");
   const contentArea = document.getElementById("editor-content");
   const previewPane = document.getElementById("preview-pane");
@@ -75,7 +83,6 @@ const pageTitle = draft?.title || "Edit Draft";
   const btnDiscard = document.getElementById("btn-discard");
   const publishBtn = document.getElementById("publish-btn");
 
-  let currentMode = "edit";
   let focusMode = false;
   let autoSaveTimeout = null;
 
@@ -102,7 +109,6 @@ const pageTitle = draft?.title || "Edit Draft";
   }
 
   function setEditorMode(mode) {
-    currentMode = mode;
     [btnEdit, btnSplit, btnPreview].forEach((button) => button.classList.remove("active"));
 
     if (mode === "edit") {
@@ -177,14 +183,14 @@ const pageTitle = draft?.title || "Edit Draft";
     saveStatus.classList.add("saving");
 
     try {
-      const response = await fetch(`/api/posts/${encodeURIComponent(slug)}`, {
-        method: "PUT",
+      const response = await fetch("/api/posts", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          title: titleInput.value.trim() || "Untitled",
+          slug,
           content: contentArea.value,
-          frontmatter: {
-            title: titleInput.value.trim() || "Untitled",
-            draft: false,
+          metadata: {
             tags: parseTags(tagsInput.value || ""),
           },
         }),

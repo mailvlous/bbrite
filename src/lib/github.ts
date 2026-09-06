@@ -13,7 +13,7 @@ export interface Post {
   title: string;
   content: string;
   frontmatter: {
-    title: string;
+    title?: string;
     draft?: boolean;
     tags?: string[];
     [key: string]: any;
@@ -162,7 +162,7 @@ export class GitHubAPI {
   async listPosts(): Promise<Post[]> {
     const posts: Post[] = [];
 
-    async function traverse(dirPath: string): Promise<void> {
+    const traverse = async (dirPath: string): Promise<void> => {
       try {
         const files = await this.listFiles(dirPath);
 
@@ -195,9 +195,9 @@ export class GitHubAPI {
       } catch (error) {
         console.error(`Error traversing ${dirPath}:`, error);
       }
-    }
+    };
 
-    await traverse.call(this, this.contentPath);
+    await traverse(this.contentPath);
     return posts.sort(
       (a, b) =>
         new Date(b.frontmatter.date || 0).getTime() -

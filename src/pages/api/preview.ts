@@ -1,7 +1,9 @@
 import type { APIRoute } from "astro";
 import { renderMarkdown } from "../../lib/markdown";
+import { guardUser, unauthorized } from "../../lib/access";
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, locals }) => {
+  if (!guardUser(locals)) return unauthorized();
   try {
     const { content } = (await request.json()) as { content: string };
 

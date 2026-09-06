@@ -11,3 +11,5 @@ CREATE TABLE IF NOT EXISTS drafts (
   updated_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_drafts_updated_at ON drafts(updated_at);
+CREATE INDEX IF NOT EXISTS idx_drafts_status ON drafts(status);
+CREATE INDEX IF NOT EXISTS idx_drafts_slug ON drafts(slug);

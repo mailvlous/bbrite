@@ -6,7 +6,6 @@ export interface Props {
 }
 
 const { draftId, slug, isPublished = false } = Astro.props;
-const pageTitle = isPublished ? `Edit: ${slug}` : "Edit Draft";
 ---
 
 <div class="command-palette" id="command-palette">
@@ -123,12 +122,12 @@ const pageTitle = isPublished ? `Edit: ${slug}` : "Edit Draft";
   });
 
   input.addEventListener("input", (e) => {
-    filterCommands((e.target as HTMLInputElement).value);
+    filterCommands(e.target.value);
   });
 
   // Click outside to close
   palette.addEventListener("click", (e) => {
-    if ((e.target as HTMLElement) === palette) {
+    if (e.target === palette) {
       hidePalette();
     }
   });

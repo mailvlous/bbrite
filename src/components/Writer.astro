@@ -52,7 +52,26 @@ const isPublished = Boolean(post);
     function metadata() { return { title: title.value, tags: tags.value.split(',').map(t => t.trim()).filter(Boolean), ...(date.value ? { date: date.value } : {}) }; }
     function render() { preview.innerHTML = DOMPurify.sanitize(marked.parse(content, { gfm: true, breaks: true }) as string); }
     function setStatus(value: string, error = false) { status.textContent = value; status.style.color = error ? 'var(--danger)' : ''; }
-    async function save() { clearTimeout(timer); localStorage.setItem('bbrite:'+id, JSON.stringify({ title:title.value, slug:slug.value, content, metadata:metadata() })); setStatus('Saving...'); try { const response = await fetch('/api/drafts/'+id, { method:'PUT', headers:{'content-type':'application/json'}, body:JSON.stringify({ id, title:title.value, slug:slug.value, content, metadata:metadata(), github_path:published ? 'content/'+slug.value+'.md' : null, github_sha: published ? writerRoot.dataset.sha : null }) }); if (!response.ok) throw new Error(); setStatus('Saved'); } catch { setStatus('Offline — saved locally', true); } }
+    async function save() {
+      clearTimeout(timer);
+      localStorage.setItem('bbrite:' + id, JSON.stringify({ title: title.value, slug: slug.value, content, metadata: metadata() }));
+      if (published) {
+        setStatus('Saved locally');
+        return;
+      }
+      setStatus('Saving...');
+      try {
+        const response = await fetch('/api/drafts/' + id, {
+          method: 'PUT',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ id, title: title.value, slug: slug.value, content, metadata: metadata() }),
+        });
+        if (!response.ok) throw new Error();
+        setStatus('Saved');
+      } catch {
+        setStatus('Offline — saved locally', true);
+      }
+    }
     function queueSave() { clearTimeout(timer); timer = setTimeout(save, 1300); }
     function format(kind: string) {
       const selection = editor.state.selection.main;
@@ -71,7 +90,26 @@ const isPublished = Boolean(post);
       const insert = line.split('\n').map((item, index) => `${kind === 'ol' ? `${index + 1}. ` : prefix[kind]}${item}`).join('\n');
       editor.dispatch({ changes: { from: selection.from, to: selection.to, insert } }); editor.focus();
     }
-    async function publish() { await save(); const endpoint = published ? '/api/posts/'+encodeURIComponent(slug.value) : '/api/posts'; const response = await fetch(endpoint, { method: published ? 'PUT' : 'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({ title:title.value, slug:slug.value, content, metadata:metadata(), sha:writerRoot.dataset.sha }) }); const data = await response.json(); if (!response.ok) { setStatus(data.error || 'Could not publish post.', true); return; } writerRoot.dataset.sha = data.sha || ''; setStatus('Published'); }
+    async function publish() {
+      await save();
+      const endpoint = published ? '/api/posts/' + encodeURIComponent(slug.value) : '/api/posts';
+      const details = metadata();
+      const body = published
+        ? { content, frontmatter: { ...details, title: title.value || slug.value, draft: false } }
+        : { title: title.value, slug: slug.value, content, metadata: details };
+      const response = await fetch(endpoint, {
+        method: published ? 'PUT' : 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setStatus(data.error || 'Could not publish post.', true);
+        return;
+      }
+      writerRoot.dataset.sha = data.sha || '';
+      setStatus('Published');
+    }
     function exportMarkdown() { const lines = ['---', `title: ${title.value}`, 'draft: false', 'tags:', ...metadata().tags.map(t => `  - ${t}`), ...(date.value ? [`date: ${date.value}`] : []), '---', '', content, '']; const blob = new Blob([lines.join('\\n')], {type:'text/markdown'}); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = (slug.value || 'untitled')+'.md'; link.click(); URL.revokeObjectURL(link.href); }
     function setLayout(next: 'split' | 'editor' | 'preview') { layout = next; writerRoot.querySelector<HTMLElement>('[data-layout]')!.className = 'editor-grid '+(next === 'editor' ? 'editor-only' : next === 'preview' ? 'preview-only' : ''); writerRoot.querySelector<HTMLElement>('[data-command="layout"]')!.textContent = next === 'split' ? 'Editor' : next === 'editor' ? 'Preview' : 'Split'; writerRoot.querySelector<HTMLElement>('[data-editor-pane]')!.hidden = next === 'preview'; writerRoot.querySelector<HTMLElement>('[data-preview-pane]')!.hidden = next === 'editor'; }
     function command(action: string) { if (action === 'publish') publish(); else if (action === 'save') save(); else if (action === 'export') exportMarkdown(); else if (action === 'focus') document.body.classList.toggle('focus-mode'); else if (action === 'preview') setLayout(layout === 'preview' ? 'split' : 'preview'); else if (action === 'new') location.href='/new'; else if (action === 'posts' || action === 'drafts') location.href='/'+action; }

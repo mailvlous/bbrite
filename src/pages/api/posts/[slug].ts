@@ -1,9 +1,12 @@
 import type { APIRoute } from "astro";
 import { createGitHubAPI } from "../../../lib/github";
 import { renderMarkdown } from "../../../lib/markdown";
+import { getEnv } from "../../../lib/runtime";
+import { guardUser, unauthorized } from "../../../lib/access";
 import { isPathTraversal, sanitizePath } from "../../../lib/utils";
 
 export const GET: APIRoute = async ({ params, locals }) => {
+  if (!guardUser(locals)) return unauthorized();
   try {
     const { slug } = params;
 
@@ -14,7 +17,7 @@ export const GET: APIRoute = async ({ params, locals }) => {
       );
     }
 
-    const token = locals.runtime?.env?.GITHUB_TOKEN;
+    const token = getEnv().GITHUB_TOKEN;
     if (!token) {
       return new Response(
         JSON.stringify({ error: "GitHub token not configured" }),
@@ -22,7 +25,7 @@ export const GET: APIRoute = async ({ params, locals }) => {
       );
     }
 
-    const github = createGitHubAPI(locals.runtime?.env);
+    const github = createGitHubAPI(getEnv());
     const post = await github.getPost(sanitizePath(slug));
 
     if (!post) {
@@ -55,6 +58,7 @@ export const GET: APIRoute = async ({ params, locals }) => {
 };
 
 export const PUT: APIRoute = async ({ params, request, locals }) => {
+  if (!guardUser(locals)) return unauthorized();
   try {
     const { slug } = params;
 
@@ -65,7 +69,7 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
       );
     }
 
-    const token = locals.runtime?.env?.GITHUB_TOKEN;
+    const token = getEnv().GITHUB_TOKEN;
     if (!token) {
       return new Response(
         JSON.stringify({ error: "GitHub token not configured" }),
@@ -82,7 +86,7 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
       );
     }
 
-    const github = createGitHubAPI(locals.runtime?.env);
+    const github = createGitHubAPI(getEnv());
     const post = await github.getPost(sanitizePath(slug));
 
     if (!post) {
@@ -117,6 +121,7 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
 };
 
 export const DELETE: APIRoute = async ({ params, locals }) => {
+  if (!guardUser(locals)) return unauthorized();
   try {
     const { slug } = params;
 
@@ -127,7 +132,7 @@ export const DELETE: APIRoute = async ({ params, locals }) => {
       );
     }
 
-    const token = locals.runtime?.env?.GITHUB_TOKEN;
+    const token = getEnv().GITHUB_TOKEN;
     if (!token) {
       return new Response(
         JSON.stringify({ error: "GitHub token not configured" }),
@@ -135,7 +140,7 @@ export const DELETE: APIRoute = async ({ params, locals }) => {
       );
     }
 
-    const github = createGitHubAPI(locals.runtime?.env);
+    const github = createGitHubAPI(getEnv());
     const post = await github.getPost(sanitizePath(slug));
 
     if (!post) {

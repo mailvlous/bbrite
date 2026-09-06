@@ -211,7 +211,7 @@ const { title = "Bbrite", currentPage = "", class: className = "" } = Astro.prop
   const themeToggle = document.getElementById("theme-toggle");
   const themeIcon = themeToggle?.querySelector("span");
 
-  function applyTheme(theme) {
+  function applyTheme(theme: "light" | "dark") {
     document.documentElement.dataset.theme = theme;
     const dark = theme === "dark";
     if (themeIcon) themeIcon.textContent = dark ? "☀" : "☾";

@@ -1,11 +1,20 @@
+---
 import Layout from "../layouts/Layout.astro";
 import Card from "../components/Card.astro";
+import { listDrafts } from "../lib/db";
+import { getEnv } from "../lib/runtime";
 
 const pageTitle = "Drafts";
 
-const draftsResponse = await fetch(new URL("/api/drafts", Astro.request.url));
-const drafts = draftsResponse.ok ? await draftsResponse.json() : [];
+let drafts: any[] = [];
+const env = getEnv();
+if (env.DB) {
+  try {
+    drafts = await listDrafts(env.DB);
+  } catch {}
+}
 ---
+
 
 <Layout title={pageTitle} currentPage="drafts">
   <div class="drafts-header">
@@ -37,12 +46,12 @@ const drafts = draftsResponse.ok ? await draftsResponse.json() : [];
 </Layout>
 
 <script>
-  const searchInput = document.getElementById("draft-search");
-  const items = Array.from(document.querySelectorAll(".draft-item"));
+  const searchInput = document.getElementById("draft-search") as HTMLInputElement | null;
+  const items = Array.from(document.querySelectorAll<HTMLElement>(".draft-item"));
 
   if (searchInput) {
-    searchInput.addEventListener("input", (event) => {
-      const query = (event.target).value.trim().toLowerCase();
+    searchInput.addEventListener("input", () => {
+      const query = searchInput.value.trim().toLowerCase();
 
       items.forEach((item) => {
         const haystack = (item.getAttribute("data-search") || "").toLowerCase();

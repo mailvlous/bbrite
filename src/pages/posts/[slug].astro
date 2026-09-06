@@ -1,10 +1,17 @@
 ---
 import Layout from "../../layouts/Layout.astro";
 import MarkdownToolbar from "../../components/MarkdownToolbar.astro";
+import { getPost } from "../../lib/github";
+import { getEnv } from "../../lib/runtime";
 
 const { slug } = Astro.params;
-const postResponse = await fetch(new URL(`/api/posts/${slug ?? ""}`, Astro.request.url));
-const post = postResponse.ok ? await postResponse.json() : null;
+
+let post: any = null;
+if (slug) {
+  try {
+    post = await getPost(getEnv(), slug);
+  } catch {}
+}
 const pageTitle = post?.title || "Edit Post";
 ---
 
@@ -58,7 +65,7 @@ const pageTitle = post?.title || "Edit Post";
   </div>
 </Layout>
 
-<script define:vars={{ slugValue: slug }}>
+<script is:inline define:vars={{ slugValue: slug }}>
   const titleInput = document.getElementById("post-title");
   const contentArea = document.getElementById("editor-content");
   const previewPane = document.getElementById("preview-pane");
@@ -73,7 +80,6 @@ const pageTitle = post?.title || "Edit Post";
   const btnExport = document.getElementById("btn-export");
   const publishBtn = document.getElementById("publish-btn");
 
-  let currentMode = "edit";
   let focusMode = false;
 
   const slugify = (value) => value.toLowerCase().trim().replace(/[^\w\s-]/g, "").replace(/[\s_-]+/g, "-").replace(/^-+|-+$/g, "") || "untitled";
@@ -99,7 +105,6 @@ const pageTitle = post?.title || "Edit Post";
   }
 
   function setEditorMode(mode) {
-    currentMode = mode;
     [btnEdit, btnSplit, btnPreview].forEach((button) => button.classList.remove("active"));
 
     if (mode === "edit") {
@@ -129,8 +134,6 @@ const pageTitle = post?.title || "Edit Post";
   }
 
   async function updatePost() {
-    const nextSlug = slugInput.value.trim() || slugify(titleInput.value || "Untitled");
-
     saveStatus.textContent = "Updating...";
     saveStatus.classList.add("saving");
 

@@ -1,11 +1,14 @@
 import type { APIRoute } from "astro";
 import { listDrafts, saveDraft } from "../../../lib/db";
 import type { Draft } from "../../../lib/db";
+import { getEnv } from "../../../lib/runtime";
+import { guardUser, unauthorized } from "../../../lib/access";
 import { validateSlug, validateTitle, generateId } from "../../../lib/utils";
 
 export const GET: APIRoute = async ({ locals }) => {
+  if (!guardUser(locals)) return unauthorized();
   try {
-    const db = locals.runtime?.env?.DB;
+    const db = getEnv().DB;
     if (!db) {
       return new Response(
         JSON.stringify({ error: "Database not configured" }),
@@ -28,8 +31,9 @@ export const GET: APIRoute = async ({ locals }) => {
 };
 
 export const POST: APIRoute = async ({ request, locals }) => {
+  if (!guardUser(locals)) return unauthorized();
   try {
-    const db = locals.runtime?.env?.DB;
+    const db = getEnv().DB;
     if (!db) {
       return new Response(
         JSON.stringify({ error: "Database not configured" }),

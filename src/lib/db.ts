@@ -98,7 +98,7 @@ export async function listDrafts(db: D1Database): Promise<Draft[]> {
     .prepare("SELECT * FROM drafts WHERE status = 'draft' ORDER BY updated_at DESC")
     .all<any>();
 
-  return results.results.map((r) => ({
+  return results.results.map((r: any) => ({
     ...r,
     metadata: JSON.parse(r.metadata || "{}"),
   }));

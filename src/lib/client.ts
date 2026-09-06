@@ -34,10 +34,15 @@ export async function publishPost(
   content: string,
   frontmatter: Record<string, any>
 ): Promise<{ success: boolean }> {
-  const response = await fetch(`/api/posts/${slug}`, {
-    method: "PUT",
+  const response = await fetch("/api/posts", {
+    method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ content, frontmatter }),
+    body: JSON.stringify({
+      title: frontmatter.title || slug,
+      slug,
+      content,
+      metadata: frontmatter,
+    }),
   });
 
   if (!response.ok) {
@@ -78,10 +83,10 @@ export function createFrontmatter(data: {
   [key: string]: any;
 }): Record<string, any> {
   return {
+    ...data,
     title: data.title || "Untitled",
     draft: data.draft ?? false,
     tags: data.tags ?? [],
-    ...data,
   };
 }
 
