@@ -152,9 +152,16 @@ Your content here."
     pathPreview.textContent = `${folder ? `${folder}/` : ""}${slug}.md`;
   }
 
+  let previewRenderId = 0;
+
   async function updatePreview() {
+    const renderId = ++previewRenderId;
     const markdown = contentArea.value || "";
-    previewContent.innerHTML = "<p>Rendering preview…</p>";
+    const previousScrollTop = previewPane.scrollTop;
+    if (!previewContent.hasChildNodes()) {
+      previewContent.innerHTML = "<p>Rendering preview…</p>";
+    }
+    previewPane.setAttribute("aria-busy", "true");
 
     try {
       const html = await fetch("/api/preview", {
@@ -169,9 +176,18 @@ Your content here."
         return data.html || "";
       });
 
+      if (renderId !== previewRenderId) return;
       previewContent.innerHTML = html || "<p>Nothing to preview yet.</p>";
     } catch (error) {
+      if (renderId !== previewRenderId) return;
       previewContent.innerHTML = "<p>Preview unavailable right now.</p>";
+    } finally {
+      if (renderId === previewRenderId) {
+        previewPane.removeAttribute("aria-busy");
+        requestAnimationFrame(() => {
+          previewPane.scrollTop = previousScrollTop;
+        });
+      }
     }
   }
 
