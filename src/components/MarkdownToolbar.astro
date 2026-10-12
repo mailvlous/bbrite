@@ -10,6 +10,8 @@
   <button type="button" data-format="strike" title="Strikethrough"><s>S</s></button>
   <button type="button" data-format="task" title="Task list">☑</button>
   <button type="button" data-format="math" title="Math">∑</button>
+  <button type="button" data-upload-pdf title="Upload PDF">PDF</button>
+  <input data-pdf-input type="file" accept="application/pdf,.pdf" hidden />
 </div>
 
 <script>
@@ -17,6 +19,8 @@
 
   const toolbar = document.querySelector<HTMLElement>(".markdown-toolbar");
   const editor = document.getElementById("editor-content") as HTMLTextAreaElement | null;
+  const pdfButton = toolbar?.querySelector<HTMLButtonElement>("[data-upload-pdf]");
+  const pdfInput = toolbar?.querySelector<HTMLInputElement>("[data-pdf-input]");
 
   const formats: Record<string, Format> = {
     bold: { prefix: "**", suffix: "**", placeholder: "bold text" },
@@ -60,6 +64,44 @@
     editor.dispatchEvent(new Event("input", { bubbles: true }));
   }
 
+  function displayName(filename: string): string {
+    return filename.replace(/\.pdf$/i, "").replace(/[-_]+/g, " ").trim() || "Open PDF";
+  }
+
+  async function uploadPdf(file: File) {
+    if (!editor) return;
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) return;
+
+    const status = document.getElementById("save-status");
+    if (file.size === 0 || file.size > 10 * 1024 * 1024) {
+      window.showToast?.("PDF must be between 1 byte and 10 MB.", "error");
+      return;
+    }
+
+    if (status) status.textContent = "Uploading PDF...";
+    pdfButton?.setAttribute("disabled", "");
+    try {
+      const form = new FormData();
+      form.append("asset", file, file.name || "document.pdf");
+      const response = await fetch("/api/assets", { method: "POST", body: form });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "PDF upload failed");
+
+      const markdown = `![[assets/${payload.filename}|${displayName(file.name)}]]`;
+      editor.setRangeText(markdown, editor.selectionStart, editor.selectionEnd, "end");
+      editor.focus();
+      editor.dispatchEvent(new Event("input", { bubbles: true }));
+      if (status) status.textContent = "PDF uploaded";
+      window.showToast?.("PDF uploaded and inserted", "success");
+    } catch (error) {
+      if (status) status.textContent = "Upload error";
+      window.showToast?.(error instanceof Error ? error.message : "PDF upload failed", "error");
+    } finally {
+      pdfButton?.removeAttribute("disabled");
+      if (pdfInput) pdfInput.value = "";
+    }
+  }
+
   toolbar?.addEventListener("mousedown", (event) => {
     event.preventDefault();
   });
@@ -78,6 +120,35 @@
 
     const format = formatName ? formats[formatName] : undefined;
     if (format) replaceSelection(format);
+  });
+
+  pdfButton?.addEventListener("click", () => pdfInput?.click());
+  pdfInput?.addEventListener("change", () => {
+    const file = pdfInput.files?.[0];
+    if (file) uploadPdf(file);
+  });
+
+  editor?.addEventListener("dragover", (event) => {
+    if (Array.from(event.dataTransfer?.items || []).some((item) => item.type === "application/pdf")) {
+      event.preventDefault();
+      event.dataTransfer!.dropEffect = "copy";
+    }
+  });
+  editor?.addEventListener("drop", (event) => {
+    const pdf = Array.from(event.dataTransfer?.files || []).find(
+      (file) => file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf"),
+    );
+    if (!pdf) return;
+    event.preventDefault();
+    uploadPdf(pdf);
+  });
+  editor?.addEventListener("paste", (event) => {
+    const pdf = Array.from(event.clipboardData?.files || []).find(
+      (file) => file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf"),
+    );
+    if (!pdf) return;
+    event.preventDefault();
+    uploadPdf(pdf);
   });
 </script>
 
@@ -117,5 +188,12 @@
   .markdown-toolbar button:nth-child(6) {
     font-family: var(--font-mono);
     font-size: 0.75rem;
+  }
+
+  .markdown-toolbar button[data-upload-pdf] {
+    width: auto;
+    min-width: 3rem;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
   }
 </style>

@@ -10,6 +10,7 @@ export interface GitHubFile {
 
 export interface Post {
   slug: string;
+  folder: string;
   title: string;
   content: string;
   frontmatter: {
@@ -46,10 +47,29 @@ export class GitHubAPI {
 
   private headers(): Record<string, string> {
     return {
-      Authorization: `token ${this.token}`,
-      Accept: "application/vnd.github.v3.raw+json",
+      Authorization: `Bearer ${this.token}`,
+      Accept: "application/vnd.github+json",
       "Content-Type": "application/json",
+      "User-Agent": "bbrite/0.1",
+      "X-GitHub-Api-Version": "2026-03-10",
     };
+  }
+
+  private async responseError(action: string, response: Response): Promise<Error> {
+    const raw = await response.text();
+    let detail = raw.trim();
+
+    try {
+      const parsed = JSON.parse(raw) as { message?: unknown };
+      if (typeof parsed.message === "string") detail = parsed.message;
+    } catch {
+      // GitHub and intermediary errors are not guaranteed to be JSON.
+    }
+
+    if (detail.length > 300) detail = `${detail.slice(0, 300)}…`;
+    return new Error(
+      `GitHub ${action} failed (${response.status}): ${detail || response.statusText}`
+    );
   }
 
   async getFile(path: string): Promise<GitHubFile | null> {
@@ -60,7 +80,7 @@ export class GitHubAPI {
       );
 
       if (response.status === 404) return null;
-      if (!response.ok) throw new Error(`GitHub API error: ${response.status}`);
+      if (!response.ok) throw await this.responseError("read", response);
 
       const data = await response.json();
 
@@ -84,7 +104,8 @@ export class GitHubAPI {
         { headers: this.headers() }
       );
 
-      if (!response.ok) throw new Error(`GitHub API error: ${response.status}`);
+      if (response.status === 404) return [];
+      if (!response.ok) throw await this.responseError("list", response);
 
       const data = await response.json();
 
@@ -138,7 +159,7 @@ export class GitHubAPI {
       );
 
       if (response.status === 404) return null;
-      if (!response.ok) throw new Error(`GitHub API error: ${response.status}`);
+      if (!response.ok) throw await this.responseError("read", response);
 
       const data = await response.json();
       const content = Buffer.from(data.content, "base64").toString("utf-8");
@@ -147,6 +168,7 @@ export class GitHubAPI {
 
       return {
         slug,
+        folder: slug.split("/").slice(0, -1).join("/"),
         title: frontmatter.title || slug,
         content: body,
         frontmatter,
@@ -155,7 +177,7 @@ export class GitHubAPI {
       };
     } catch (error) {
       console.error(`Error fetching post ${slug}:`, error);
-      return null;
+      throw error;
     }
   }
 
@@ -180,9 +202,14 @@ export class GitHubAPI {
 
               if (frontmatter.draft === true) continue;
 
-              const slug = file.name.replace(/\.md$/, "");
+              const prefix = `${this.contentPath}/`;
+              const relativePath = file.path.startsWith(prefix)
+                ? file.path.slice(prefix.length)
+                : file.path;
+              const slug = relativePath.replace(/\.md$/, "");
               posts.push({
                 slug,
+                folder: slug.split("/").slice(0, -1).join("/"),
                 title: frontmatter.title || slug,
                 content: body,
                 frontmatter,
@@ -224,10 +251,32 @@ export class GitHubAPI {
     );
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(`Failed to create file: ${JSON.stringify(error)}`);
+      throw await this.responseError("create", response);
     }
 
+    const data = await response.json();
+    return { sha: data.content.sha };
+  }
+
+  async createBase64File(
+    path: string,
+    base64Content: string,
+    message: string
+  ): Promise<{ sha: string }> {
+    const response = await fetch(
+      `${this.apiBase}/repos/${this.owner}/${this.repo}/contents/${path}`,
+      {
+        method: "PUT",
+        headers: this.headers(),
+        body: JSON.stringify({
+          message,
+          content: base64Content,
+          branch: this.branch,
+        }),
+      }
+    );
+
+    if (!response.ok) throw await this.responseError("upload", response);
     const data = await response.json();
     return { sha: data.content.sha };
   }
@@ -253,8 +302,7 @@ export class GitHubAPI {
     );
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(`Failed to update file: ${JSON.stringify(error)}`);
+      throw await this.responseError("update", response);
     }
 
     const data = await response.json();
@@ -276,8 +324,7 @@ export class GitHubAPI {
     );
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(`Failed to delete file: ${JSON.stringify(error)}`);
+      throw await this.responseError("delete", response);
     }
   }
 }
@@ -317,15 +364,10 @@ export async function writePost(
   const contentPath = env.CONTENT_PATH || "content";
   const path = `${contentPath}/${slug}.md`;
   
-  try {
-    // Try to get the existing file first to check if it exists
-    const existing = await api.getPost(slug);
-    if (existing) {
-      const result = await api.updateFile(path, content, existing.sha, message);
-      return { content: { sha: result.sha } };
-    }
-  } catch {
-    // File doesn't exist, will create it
+  const existing = await api.getPost(slug);
+  if (existing) {
+    const result = await api.updateFile(path, content, existing.sha, message);
+    return { content: { sha: result.sha } };
   }
   
   // Create the file if it doesn't exist

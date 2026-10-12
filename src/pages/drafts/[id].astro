@@ -3,6 +3,7 @@ import Layout from "../../layouts/Layout.astro";
 import MarkdownToolbar from "../../components/MarkdownToolbar.astro";
 import { getDraft } from "../../lib/db";
 import { getEnv } from "../../lib/runtime";
+import { listPosts } from "../../lib/github";
 
 const { id } = Astro.params;
 
@@ -14,6 +15,10 @@ if (id && env.DB) {
   } catch {}
 }
 const pageTitle = draft?.title || "Edit Draft";
+let folders: string[] = [];
+try {
+  folders = [...new Set((await listPosts(env)).map((post) => post.folder).filter(Boolean))].sort();
+} catch {}
 ---
 
 <Layout title={pageTitle} currentPage="drafts">
@@ -50,6 +55,11 @@ const pageTitle = draft?.title || "Edit Draft";
 
     <div class="editor-metadata">
       <div class="metadata-group">
+        <label for="post-folder">Folder (optional)</label>
+        <input type="text" id="post-folder" list="folder-options" class="metadata-input" value={draft?.metadata?.folder || ""} placeholder="college/fourth-semester" />
+        <datalist id="folder-options">{folders.map((folder) => <option value={folder} />)}</datalist>
+      </div>
+      <div class="metadata-group">
         <label for="post-slug">Slug</label>
         <input type="text" id="post-slug" class="metadata-input" value={draft?.slug || ""} />
       </div>
@@ -75,6 +85,7 @@ const pageTitle = draft?.title || "Edit Draft";
   const saveStatus = document.getElementById("save-status");
   const slugInput = document.getElementById("post-slug");
   const tagsInput = document.getElementById("post-tags");
+  const folderInput = document.getElementById("post-folder");
   const btnEdit = document.getElementById("btn-edit");
   const btnSplit = document.getElementById("btn-split");
   const btnPreview = document.getElementById("btn-preview");
@@ -88,6 +99,9 @@ const pageTitle = draft?.title || "Edit Draft";
 
   const slugify = (value) => value.toLowerCase().trim().replace(/[^\w\s-]/g, "").replace(/[\s_-]+/g, "-").replace(/^-+|-+$/g, "") || "untitled";
   const parseTags = (value) => value.split(",").map((tag) => tag.trim()).filter(Boolean);
+  const normalizeFolder = (value) => value.split("/")
+    .map((part) => part.trim().replace(/[^A-Za-z0-9 _-]+/g, "-").replace(/\s+/g, " ").replace(/^[ _-]+|[ _-]+$/g, ""))
+    .filter(Boolean).join("/");
 
   async function updatePreview() {
     const markdown = contentArea.value || "";
@@ -128,12 +142,38 @@ const pageTitle = draft?.title || "Edit Draft";
     updatePreview();
   }
 
+  async function handleImagePaste(event) {
+    const image = Array.from(event.clipboardData?.files || []).find((file) => file.type.startsWith("image/"));
+    if (!image) return;
+    event.preventDefault();
+    saveStatus.textContent = "Uploading image...";
+    saveStatus.classList.add("saving");
+    try {
+      const form = new FormData();
+      form.append("image", image, image.name || "pasted-image.png");
+      const response = await fetch("/api/assets", { method: "POST", body: form });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "Image upload failed");
+      const alt = (image.name || "image").replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ");
+      contentArea.setRangeText(`![${alt}](${payload.url})`, contentArea.selectionStart, contentArea.selectionEnd, "end");
+      contentArea.dispatchEvent(new Event("input", { bubbles: true }));
+      saveStatus.textContent = "Image uploaded";
+      saveStatus.classList.remove("saving");
+      if (window.showToast) window.showToast("Image uploaded and inserted", "success");
+    } catch (error) {
+      saveStatus.textContent = "Upload error";
+      saveStatus.classList.add("error");
+      saveStatus.classList.remove("saving");
+      if (window.showToast) window.showToast(error.message || "Image upload failed", "error");
+    }
+  }
+
   async function saveCurrentDraft() {
     const draftBody = {
       title: titleInput.value.trim() || "Untitled",
       slug: slugInput.value.trim() || slugify(titleInput.value || "Untitled"),
       content: contentArea.value,
-      metadata: { tags: parseTags(tagsInput.value || "") },
+      metadata: { tags: parseTags(tagsInput.value || ""), folder: normalizeFolder(folderInput.value || "") },
       status: "draft",
     };
 
@@ -189,6 +229,7 @@ const pageTitle = draft?.title || "Edit Draft";
         body: JSON.stringify({
           title: titleInput.value.trim() || "Untitled",
           slug,
+          folder: normalizeFolder(folderInput.value || ""),
           content: contentArea.value,
           metadata: {
             tags: parseTags(tagsInput.value || ""),
@@ -215,6 +256,7 @@ const pageTitle = draft?.title || "Edit Draft";
     updatePreview();
     triggerAutoSave();
   });
+  contentArea.addEventListener("paste", handleImagePaste);
 
   titleInput.addEventListener("input", () => {
     if (!slugInput.value.trim()) slugInput.value = slugify(titleInput.value || "Untitled");
@@ -223,6 +265,8 @@ const pageTitle = draft?.title || "Edit Draft";
 
   slugInput.addEventListener("input", triggerAutoSave);
   tagsInput.addEventListener("input", triggerAutoSave);
+  folderInput.addEventListener("input", triggerAutoSave);
+  folderInput.addEventListener("blur", () => { folderInput.value = normalizeFolder(folderInput.value || ""); });
   btnEdit.addEventListener("click", () => setEditorMode("edit"));
   btnSplit.addEventListener("click", () => setEditorMode("split"));
   btnPreview.addEventListener("click", () => setEditorMode("preview"));
@@ -274,8 +318,13 @@ const pageTitle = draft?.title || "Edit Draft";
   .editor-textarea { flex: 1; padding: 2rem; border: none; background: var(--background); color: var(--foreground); font-family: var(--font-mono); font-size: 1rem; line-height: 1.6; resize: none; overflow-y: auto; }
   .editor-textarea:focus { outline: none; }
   .preview-pane { flex: 1; padding: 2rem; background: var(--surface); border-left: 2px solid var(--border); overflow-y: auto; display: none; }
-  .preview-content { max-width: 65ch; }
-  .editor-metadata { padding: 1.5rem 2rem; background: var(--surface); border-top: 2px solid var(--border); display: none; }
+  .preview-content { max-width: 65ch; font-family: "Source Sans 3", var(--font-body); font-size: 1rem; line-height: 1.6; }
+  .preview-content :global(h1, h2, h3, h4, h5, h6) { margin-top: 1.5rem; margin-bottom: .75rem; }
+  .preview-content :global(p) { margin-bottom: 1rem; }
+  .preview-content :global(ul), .preview-content :global(ol) { margin: 0 0 1rem; padding-left: 2rem; }
+  .preview-content :global(li) { margin: .2rem 0; }
+  .preview-content :global(img) { max-width: 100%; height: auto; }
+  .editor-metadata { padding: 1rem 2rem; background: var(--surface); border-top: 2px solid var(--border); display: grid; grid-template-columns: repeat(3, minmax(180px, 1fr)) auto; gap: 1rem; align-items: end; }
   .metadata-group { margin-bottom: 1rem; }
   .metadata-group label { display: block; font-weight: 500; margin-bottom: 0.5rem; }
   .metadata-input { width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 6px; background: var(--background); color: var(--foreground); }
@@ -283,5 +332,5 @@ const pageTitle = draft?.title || "Edit Draft";
   .secondary-btn { padding: 0.6rem 1.2rem; border: 1px solid var(--border); background: var(--surface-strong); color: var(--foreground); border-radius: 6px; cursor: pointer; }
   .secondary-btn.danger:hover { background: rgba(212, 116, 95, 0.1); border-color: var(--accent-2); color: var(--accent-2); }
   body.focus-mode .editor-header, body.focus-mode .editor-toolbar { display: none; }
-  @media (max-width: 768px) { .editor-header { flex-direction: column; align-items: stretch; padding: 1rem; } .title-input { font-size: 1.5rem; } .editor-status { justify-content: space-between; } .editor-textarea, .preview-pane { padding: 1rem; } .publish-btn { width: 100%; } }
+  @media (max-width: 768px) { .editor-header { flex-direction: column; align-items: stretch; padding: 1rem; } .title-input { font-size: 1.5rem; } .editor-status { justify-content: space-between; } .editor-textarea, .preview-pane { padding: 1rem; } .publish-btn { width: 100%; } .editor-metadata { grid-template-columns: 1fr; } }
 </style>

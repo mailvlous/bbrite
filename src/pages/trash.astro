@@ -1,0 +1,79 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { getEnv } from "../lib/runtime";
+import { listTrash, type TrashManifest } from "../lib/trash";
+
+let entries: TrashManifest[] = [];
+let loadError = "";
+try { entries = await listTrash(getEnv()); }
+catch (error) { loadError = error instanceof Error ? error.message : "Could not load recycle bin."; }
+---
+
+<Layout title="Recycle Bin" currentPage="trash">
+  <header class="trash-header">
+    <div><p class="eyebrow">Recoverable storage</p><h1>Recycle Bin</h1></div>
+    <p>Deleted notes and folders stay in the Garden repository until restored.</p>
+  </header>
+
+  {loadError ? (
+    <div class="empty-state error">{loadError}</div>
+  ) : entries.length === 0 ? (
+    <div class="empty-state"><h2>Recycle bin is empty</h2><p>Items moved here can be restored to their original paths.</p></div>
+  ) : (
+    <div class="trash-list">
+      {entries.map((entry) => (
+        <article class="trash-item">
+          <div class="trash-copy">
+            <span class="kind">{entry.type}</span>
+            <h2>{entry.label}</h2>
+            <code>{entry.files.length === 1 ? entry.files[0].originalPath : `${entry.files.length} files`}</code>
+            <time datetime={entry.deletedAt}>Moved {new Date(entry.deletedAt).toLocaleString()}</time>
+          </div>
+          <button class="restore-button" data-restore-id={entry.id} data-restore-label={entry.label}>Restore</button>
+        </article>
+      ))}
+    </div>
+  )}
+</Layout>
+
+<script>
+  document.querySelectorAll<HTMLButtonElement>(".restore-button").forEach((button) => button.addEventListener("click", async () => {
+    const id = button.dataset.restoreId || "";
+    const label = button.dataset.restoreLabel || "item";
+    if (!id || !confirm(`Restore "${label}" to its original location?`)) return;
+    button.disabled = true;
+    button.textContent = "Restoring...";
+    try {
+      const response = await fetch(`/api/trash/${encodeURIComponent(id)}`, { method: "POST" });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "Restore failed.");
+      window.showToast?.("Item restored", "success");
+      window.location.reload();
+    } catch (error) {
+      window.showToast?.(error instanceof Error ? error.message : "Restore failed.", "error");
+      button.disabled = false;
+      button.textContent = "Restore";
+    }
+  }));
+</script>
+
+<style>
+  .trash-header { margin: 2.5rem 0 2rem; display: flex; align-items: end; justify-content: space-between; gap: 2rem; }
+  .trash-header h1 { margin: 0; font-size: 2rem; }
+  .trash-header > p { max-width: 430px; margin: 0; color: var(--gray); }
+  .eyebrow { margin: 0 0 .35rem; color: var(--accent-1); font: 700 .72rem var(--font-mono); letter-spacing: .12em; text-transform: uppercase; }
+  .trash-list { display: grid; gap: 1rem; }
+  .trash-item { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; padding: 1.25rem; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+  .trash-copy { min-width: 0; display: grid; gap: .4rem; }
+  .trash-copy h2 { margin: 0; font-family: var(--font-body); font-size: 1.15rem; line-height: 1.3; }
+  .trash-copy code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: transparent; padding: 0; color: var(--gray); }
+  .trash-copy time { color: var(--gray); font-size: .78rem; }
+  .kind { width: fit-content; padding: .2rem .5rem; border-radius: 999px; background: var(--surface-strong); color: var(--foreground); font: 700 .7rem var(--font-mono); text-transform: uppercase; }
+  .restore-button { flex: 0 0 auto; padding: .65rem 1rem; border: 2px solid var(--foreground); border-radius: 999px; background: var(--accent-1); color: white; font-weight: 800; }
+  .restore-button:disabled { opacity: .55; cursor: wait; }
+  .empty-state { padding: 4rem 2rem; border: 2px dashed var(--border); border-radius: 14px; background: var(--surface); text-align: center; }
+  .empty-state h2 { margin-bottom: .75rem; font-family: var(--font-body); font-size: 1.25rem; }
+  .empty-state p { color: var(--gray); }
+  .empty-state.error { color: #d60045; }
+  @media (max-width: 680px) { .trash-header, .trash-item { align-items: stretch; flex-direction: column; } .restore-button { width: 100%; } }
+</style>

@@ -49,8 +49,8 @@ const pageTitle = post?.title || "Edit Post";
 
     <div class="editor-metadata">
       <div class="metadata-group">
-        <label for="post-slug">Slug</label>
-        <input type="text" id="post-slug" class="metadata-input" value={post?.slug || ""} />
+        <label for="post-slug">Repository path</label>
+        <input type="text" id="post-slug" class="metadata-input" value={post?.slug || ""} readonly />
       </div>
 
       <div class="metadata-group">
@@ -65,7 +65,7 @@ const pageTitle = post?.title || "Edit Post";
   </div>
 </Layout>
 
-<script is:inline define:vars={{ slugValue: slug }}>
+<script is:inline define:vars={{ slugValue: slug, publishedValue: post?.frontmatter?.published || "" }}>
   const titleInput = document.getElementById("post-title");
   const contentArea = document.getElementById("editor-content");
   const previewPane = document.getElementById("preview-pane");
@@ -124,6 +124,32 @@ const pageTitle = post?.title || "Edit Post";
     updatePreview();
   }
 
+  async function handleImagePaste(event) {
+    const image = Array.from(event.clipboardData?.files || []).find((file) => file.type.startsWith("image/"));
+    if (!image) return;
+    event.preventDefault();
+    saveStatus.textContent = "Uploading image...";
+    saveStatus.classList.add("saving");
+    try {
+      const form = new FormData();
+      form.append("image", image, image.name || "pasted-image.png");
+      const response = await fetch("/api/assets", { method: "POST", body: form });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "Image upload failed");
+      const alt = (image.name || "image").replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ");
+      contentArea.setRangeText(`![${alt}](${payload.url})`, contentArea.selectionStart, contentArea.selectionEnd, "end");
+      contentArea.dispatchEvent(new Event("input", { bubbles: true }));
+      saveStatus.textContent = "Image uploaded";
+      saveStatus.classList.remove("saving");
+      if (window.showToast) window.showToast("Image uploaded and inserted", "success");
+    } catch (error) {
+      saveStatus.textContent = "Upload error";
+      saveStatus.classList.add("error");
+      saveStatus.classList.remove("saving");
+      if (window.showToast) window.showToast(error.message || "Image upload failed", "error");
+    }
+  }
+
   function exportMarkdown() {
     const element = document.createElement("a");
     element.setAttribute("href", `data:text/plain;charset=utf-8,${encodeURIComponent(contentArea.value)}`);
@@ -138,7 +164,8 @@ const pageTitle = post?.title || "Edit Post";
     saveStatus.classList.add("saving");
 
     try {
-      const response = await fetch(`/api/posts/${encodeURIComponent(slugValue)}`, {
+      const postUrl = String(slugValue).split("/").map(encodeURIComponent).join("/");
+      const response = await fetch(`/api/posts/${postUrl}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -147,6 +174,7 @@ const pageTitle = post?.title || "Edit Post";
             title: titleInput.value.trim() || "Untitled",
             draft: false,
             tags: parseTags(tagsInput.value || ""),
+            published: publishedValue || new Date().toISOString().slice(0, 10),
           },
         }),
       });
@@ -172,6 +200,7 @@ const pageTitle = post?.title || "Edit Post";
   });
 
   contentArea.addEventListener("input", updatePreview);
+  contentArea.addEventListener("paste", handleImagePaste);
   btnEdit.addEventListener("click", () => setEditorMode("edit"));
   btnSplit.addEventListener("click", () => setEditorMode("split"));
   btnPreview.addEventListener("click", () => setEditorMode("preview"));
@@ -216,13 +245,18 @@ const pageTitle = post?.title || "Edit Post";
   .editor-textarea { flex: 1; padding: 2rem; border: none; background: var(--background); color: var(--foreground); font-family: var(--font-mono); font-size: 1rem; line-height: 1.6; resize: none; overflow-y: auto; }
   .editor-textarea:focus { outline: none; }
   .preview-pane { flex: 1; padding: 2rem; background: var(--surface); border-left: 2px solid var(--border); overflow-y: auto; display: none; }
-  .preview-content { max-width: 65ch; }
-  .editor-metadata { padding: 1.5rem 2rem; background: var(--surface); border-top: 2px solid var(--border); display: none; }
+  .preview-content { max-width: 65ch; font-family: "Source Sans 3", var(--font-body); font-size: 1rem; line-height: 1.6; }
+  .preview-content :global(h1, h2, h3, h4, h5, h6) { margin-top: 1.5rem; margin-bottom: .75rem; }
+  .preview-content :global(p) { margin-bottom: 1rem; }
+  .preview-content :global(ul), .preview-content :global(ol) { margin: 0 0 1rem; padding-left: 2rem; }
+  .preview-content :global(li) { margin: .2rem 0; }
+  .preview-content :global(img) { max-width: 100%; height: auto; }
+  .editor-metadata { padding: 1rem 2rem; background: var(--surface); border-top: 2px solid var(--border); display: grid; grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) auto; gap: 1rem; align-items: end; }
   .metadata-group { margin-bottom: 1rem; }
   .metadata-group label { display: block; font-weight: 500; margin-bottom: 0.5rem; }
   .metadata-input { width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 6px; background: var(--background); color: var(--foreground); }
   .metadata-actions { display: flex; gap: 1rem; margin-top: 1.5rem; }
   .secondary-btn { padding: 0.6rem 1.2rem; border: 1px solid var(--border); background: var(--surface-strong); color: var(--foreground); border-radius: 6px; cursor: pointer; }
   body.focus-mode .editor-header, body.focus-mode .editor-toolbar { display: none; }
-  @media (max-width: 768px) { .editor-header { flex-direction: column; align-items: stretch; padding: 1rem; } .title-input { font-size: 1.5rem; } .editor-status { justify-content: space-between; } .editor-textarea, .preview-pane { padding: 1rem; } .publish-btn { width: 100%; } }
+  @media (max-width: 768px) { .editor-header { flex-direction: column; align-items: stretch; padding: 1rem; } .title-input { font-size: 1.5rem; } .editor-status { justify-content: space-between; } .editor-textarea, .preview-pane { padding: 1rem; } .publish-btn { width: 100%; } .editor-metadata { grid-template-columns: 1fr; } }
 </style>

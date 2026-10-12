@@ -3,7 +3,7 @@ const { draft = null, post = null } = Astro.props;
 const record = draft || post || { id: crypto.randomUUID(), title: '', slug: '', content: '', metadata: {}, github_sha: null };
 const isPublished = Boolean(post);
 ---
-<div class="app-shell" data-writer data-id={record.id} data-published={isPublished} data-sha={record.github_sha || post?.sha || ''} data-content={record.content}>
+<div class="app-shell" data-writer data-id={record.id} data-published={isPublished} data-published-date={post?.frontmatter?.published || record.metadata?.published || ''} data-sha={record.github_sha || post?.sha || ''} data-content={record.content}>
   <header class="topbar"><a class="brand" href="/">BBRITE</a><span class="status" data-status>Ready</span></header>
   <main class="writer">
     <section class="metadata">
@@ -24,6 +24,8 @@ const isPublished = Boolean(post);
       <button class="format-button" data-format="strike" aria-label="Strikethrough" title="Strikethrough">S</button>
       <button class="format-button" data-format="task" aria-label="Task list" title="Task list">☑</button>
       <button class="format-button" data-format="math" aria-label="Math" title="Math">Σ</button>
+      <button class="format-button pdf-button" data-upload-pdf aria-label="Upload PDF" title="Upload PDF">PDF</button>
+      <input data-pdf-input type="file" accept="application/pdf,.pdf" hidden />
     </nav>
     <section class="editor-grid" data-layout="split">
       <div class="editor-pane" data-editor-pane><div class="pane-label">Markdown</div><div class="cm-wrap" data-editor></div></div>
@@ -45,13 +47,69 @@ const isPublished = Boolean(post);
   const root = document.querySelector<HTMLElement>('[data-writer]');
   if (root) {
     const writerRoot = root;
-    const id = writerRoot.dataset.id || crypto.randomUUID(); const published = writerRoot.dataset.published === 'true';
+    const id = writerRoot.dataset.id || crypto.randomUUID(); const published = writerRoot.dataset.published === 'true'; const publishedDate = writerRoot.dataset.publishedDate || '';
     const title = writerRoot.querySelector<HTMLInputElement>('[data-title]')!; const slug = writerRoot.querySelector<HTMLInputElement>('[data-slug]')!; const tags = writerRoot.querySelector<HTMLInputElement>('[data-tags]')!; const date = writerRoot.querySelector<HTMLInputElement>('[data-date]')!; const status = writerRoot.querySelector<HTMLElement>('[data-status]')!; const preview = writerRoot.querySelector<HTMLElement>('[data-preview]')!;
     let content = writerRoot.dataset.content || ''; let timer: ReturnType<typeof setTimeout>; let layout: 'split' | 'editor' | 'preview' = 'split';
     const editor = new EditorView({ state: EditorState.create({ doc: content, extensions: [markdown(), oneDark, keymap.of([...defaultKeymap, indentWithTab]), EditorView.updateListener.of(update => { if (update.docChanged) { content = update.state.doc.toString(); render(); queueSave(); } })] }), parent: writerRoot.querySelector('[data-editor]')! });
     function metadata() { return { title: title.value, tags: tags.value.split(',').map(t => t.trim()).filter(Boolean), ...(date.value ? { date: date.value } : {}) }; }
-    function render() { preview.innerHTML = DOMPurify.sanitize(marked.parse(content, { gfm: true, breaks: true }) as string); }
+    function enhancePdfPreviews() {
+      preview.querySelectorAll<HTMLAnchorElement>('a[href]').forEach(link => {
+        if (!/\.pdf(?:[?#].*)?$/i.test(link.getAttribute('href') || '') || link.closest('.pdf-attachment')) return;
+        const wrapper = document.createElement('span');
+        wrapper.className = 'pdf-attachment';
+        link.classList.add('pdf-attachment-link');
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.replaceWith(wrapper);
+        wrapper.append(link);
+        const frame = document.createElement('iframe');
+        frame.className = 'pdf-preview';
+        frame.src = link.href;
+        frame.title = 'PDF preview';
+        frame.loading = 'lazy';
+        wrapper.append(frame);
+      });
+    }
+    function render() {
+      const previewMarkdown = content.replace(
+        /!\[\[assets\/([^\]|]+\.pdf)(?:\|([^\]]+))?\]\]/gi,
+        (_match, filename, label) => `[${label || filename.replace(/\.pdf$/i, '')}](/assets/${filename})`,
+      );
+      const html = DOMPurify.sanitize(marked.parse(previewMarkdown, { gfm: true, breaks: false }) as string);
+      preview.innerHTML = html
+        .replace(/src="\/assets\//g, 'src="/api/assets/')
+        .replace(/href="\/assets\//g, 'href="/api/assets/');
+      enhancePdfPreviews();
+    }
     function setStatus(value: string, error = false) { status.textContent = value; status.style.color = error ? 'var(--danger)' : ''; }
+    async function uploadAsset(file: File) {
+      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+      const isImage = file.type.startsWith('image/');
+      if (!isPdf && !isImage) return;
+      setStatus(`Uploading ${isPdf ? 'PDF' : 'image'}...`);
+      try {
+        const form = new FormData();
+        form.append(isPdf ? 'asset' : 'image', file, file.name || (isPdf ? 'document.pdf' : 'pasted-image.png'));
+        const response = await fetch('/api/assets', { method: 'POST', body: form });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || 'File upload failed');
+        const selection = editor.state.selection.main;
+        const label = (file.name || (isPdf ? 'Open PDF' : 'image')).replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ');
+        const insert = isPdf ? `![[assets/${data.filename}|${label}]]` : `![${label}](${data.url})`;
+        editor.dispatch({ changes: { from: selection.from, to: selection.to, insert }, selection: { anchor: selection.from + insert.length } });
+        editor.focus();
+        setStatus(`${isPdf ? 'PDF' : 'Image'} uploaded`);
+        window.showToast?.(`${isPdf ? 'PDF' : 'Image'} uploaded and inserted`, 'success');
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : 'File upload failed', true);
+      }
+    }
+    function pasteAsset(event: ClipboardEvent) {
+      const file = Array.from(event.clipboardData?.files || []).find(item => item.type.startsWith('image/') || item.type === 'application/pdf' || item.name.toLowerCase().endsWith('.pdf'));
+      if (!file) return;
+      event.preventDefault();
+      uploadAsset(file);
+    }
     async function save() {
       clearTimeout(timer);
       localStorage.setItem('bbrite:' + id, JSON.stringify({ title: title.value, slug: slug.value, content, metadata: metadata() }));
@@ -92,10 +150,11 @@ const isPublished = Boolean(post);
     }
     async function publish() {
       await save();
-      const endpoint = published ? '/api/posts/' + encodeURIComponent(slug.value) : '/api/posts';
+      const encodedSlug = slug.value.split('/').map(encodeURIComponent).join('/');
+      const endpoint = published ? '/api/posts/' + encodedSlug : '/api/posts';
       const details = metadata();
       const body = published
-        ? { content, frontmatter: { ...details, title: title.value || slug.value, draft: false } }
+        ? { content, frontmatter: { ...details, title: title.value || slug.value, draft: false, published: publishedDate || new Date().toISOString().slice(0, 10) } }
         : { title: title.value, slug: slug.value, content, metadata: details };
       const response = await fetch(endpoint, {
         method: published ? 'PUT' : 'POST',
@@ -114,6 +173,19 @@ const isPublished = Boolean(post);
     function setLayout(next: 'split' | 'editor' | 'preview') { layout = next; writerRoot.querySelector<HTMLElement>('[data-layout]')!.className = 'editor-grid '+(next === 'editor' ? 'editor-only' : next === 'preview' ? 'preview-only' : ''); writerRoot.querySelector<HTMLElement>('[data-command="layout"]')!.textContent = next === 'split' ? 'Editor' : next === 'editor' ? 'Preview' : 'Split'; writerRoot.querySelector<HTMLElement>('[data-editor-pane]')!.hidden = next === 'preview'; writerRoot.querySelector<HTMLElement>('[data-preview-pane]')!.hidden = next === 'editor'; }
     function command(action: string) { if (action === 'publish') publish(); else if (action === 'save') save(); else if (action === 'export') exportMarkdown(); else if (action === 'focus') document.body.classList.toggle('focus-mode'); else if (action === 'preview') setLayout(layout === 'preview' ? 'split' : 'preview'); else if (action === 'new') location.href='/new'; else if (action === 'posts' || action === 'drafts') location.href='/'+action; }
     writerRoot.addEventListener('click', event => { const target = event.target as HTMLElement; const formatKind = target.dataset.format; const action = target.dataset.command || target.dataset.action; if (formatKind) format(formatKind); else if (action === 'layout') setLayout(layout === 'split' ? 'editor' : layout === 'editor' ? 'preview' : 'split'); else if (action) command(action); });
+    const pdfInput = writerRoot.querySelector<HTMLInputElement>('[data-pdf-input]');
+    writerRoot.querySelector<HTMLButtonElement>('[data-upload-pdf]')?.addEventListener('click', () => pdfInput?.click());
+    pdfInput?.addEventListener('change', () => { const file = pdfInput.files?.[0]; if (file) uploadAsset(file); pdfInput.value = ''; });
+    editor.dom.addEventListener('paste', pasteAsset);
+    editor.dom.addEventListener('dragover', event => {
+      if (Array.from(event.dataTransfer?.items || []).some(item => item.type === 'application/pdf')) event.preventDefault();
+    });
+    editor.dom.addEventListener('drop', event => {
+      const pdf = Array.from(event.dataTransfer?.files || []).find(file => file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'));
+      if (!pdf) return;
+      event.preventDefault();
+      uploadAsset(pdf);
+    });
     [title, slug, tags, date].forEach(input => input?.addEventListener('input', queueSave)); window.addEventListener('blur', save); window.addEventListener('pagehide', save); document.addEventListener('keydown', event => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); save(); } if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); publish(); } if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'p') { event.preventDefault(); const palette = writerRoot.querySelector('[data-palette]') as HTMLElement; palette.hidden = !palette.hidden; if (!palette.hidden) (palette.querySelector('input') as HTMLInputElement).focus(); } if (event.key === 'Escape') { (writerRoot.querySelector('[data-palette]') as HTMLElement).hidden = true; document.body.classList.remove('focus-mode'); } }); render();
   }
 </script>

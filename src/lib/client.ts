@@ -40,6 +40,7 @@ export async function publishPost(
     body: JSON.stringify({
       title: frontmatter.title || slug,
       slug,
+      folder: frontmatter.folder || "",
       content,
       metadata: frontmatter,
     }),
@@ -112,7 +113,8 @@ export async function deleteDraft(id: string): Promise<void> {
 }
 
 export async function deletePost(slug: string): Promise<void> {
-  const response = await fetch(`/api/posts/${slug}`, {
+  const path = slug.split("/").map(encodeURIComponent).join("/");
+  const response = await fetch(`/api/posts/${path}`, {
     method: "DELETE",
   });
 

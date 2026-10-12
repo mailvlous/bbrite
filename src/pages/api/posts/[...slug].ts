@@ -3,8 +3,10 @@ import { createGitHubAPI } from "../../../lib/github";
 import { renderMarkdown } from "../../../lib/markdown";
 import { getEnv } from "../../../lib/runtime";
 import { guardUser, unauthorized } from "../../../lib/access";
-import { isPathTraversal, sanitizePath } from "../../../lib/utils";
+import { isPathTraversal } from "../../../lib/utils";
+import { moveFilesToTrash } from "../../../lib/trash";
 
+// Catch-all route keeps nested repository paths addressable.
 export const GET: APIRoute = async ({ params, locals }) => {
   if (!guardUser(locals)) return unauthorized();
   try {
@@ -26,7 +28,7 @@ export const GET: APIRoute = async ({ params, locals }) => {
     }
 
     const github = createGitHubAPI(getEnv());
-    const post = await github.getPost(sanitizePath(slug));
+    const post = await github.getPost(slug);
 
     if (!post) {
       return new Response(
@@ -87,7 +89,7 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
     }
 
     const github = createGitHubAPI(getEnv());
-    const post = await github.getPost(sanitizePath(slug));
+    const post = await github.getPost(slug);
 
     if (!post) {
       return new Response(
@@ -141,7 +143,7 @@ export const DELETE: APIRoute = async ({ params, locals }) => {
     }
 
     const github = createGitHubAPI(getEnv());
-    const post = await github.getPost(sanitizePath(slug));
+    const post = await github.getPost(slug);
 
     if (!post) {
       return new Response(
@@ -150,23 +152,19 @@ export const DELETE: APIRoute = async ({ params, locals }) => {
       );
     }
 
-    await github.deleteFile(
-      post.path,
-      post.sha,
-      `chore: delete post ${slug}`
-    );
+    const manifest = await moveFilesToTrash(getEnv(), "note", post.title, [{ path: post.path, sha: post.sha }]);
 
     return new Response(
-      JSON.stringify({ success: true }),
+      JSON.stringify({ success: true, trashId: manifest.id }),
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
       }
     );
   } catch (error) {
-    console.error("Error deleting post:", error);
+    console.error("Error moving post to trash:", error);
     return new Response(
-      JSON.stringify({ error: "Failed to delete post" }),
+      JSON.stringify({ error: error instanceof Error ? error.message : "Failed to move note to trash" }),
       { status: 500 }
     );
   }

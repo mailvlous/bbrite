@@ -1,133 +1,176 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import Card from "../components/Card.astro";
-import { listPosts } from "../lib/github";
+import { listPosts, type Post } from "../lib/github";
 import { getEnv } from "../lib/runtime";
 
 const pageTitle = "Posts";
+let posts: Post[] = [];
+try { posts = await listPosts(getEnv()); } catch {}
 
-let posts: any[] = [];
-try {
-  posts = await listPosts(getEnv());
-} catch {}
+const postFolders = [...new Set(posts.map((post) => post.folder || ""))].sort((a, b) => a.localeCompare(b));
+const folders = [...new Set(postFolders.flatMap((folder) => {
+  if (!folder) return [""];
+  const parts = folder.split("/");
+  return parts.map((_, index) => parts.slice(0, index + 1).join("/"));
+}))].sort((a, b) => a.localeCompare(b));
+const groups = postFolders.map((folder) => ({ folder, posts: posts.filter((post) => (post.folder || "") === folder) }));
+const postHref = (slug: string) => `/posts/${slug.split("/").map(encodeURIComponent).join("/")}`;
+const folderPostCount = (folder: string) => posts.filter((post) =>
+  folder === "" ? !post.folder : post.folder === folder || post.folder.startsWith(`${folder}/`)
+).length;
 ---
-
 
 <Layout title={pageTitle} currentPage="posts">
   <div class="posts-header">
-    <h1>Published Posts</h1>
-    <input
-      type="search"
-      id="search-posts"
-      placeholder="Search posts..."
-      class="search-input"
-    />
+    <div><p class="eyebrow">Repository browser</p><h1>Published Notes</h1></div>
+    <input type="search" id="search-posts" placeholder="Search titles, tags, or paths..." class="search-input" />
   </div>
 
   {posts.length > 0 ? (
-    <div class="posts-grid" id="posts-grid">
-      {posts.map((post) => (
-        <div class="post-item" data-search={(`${post.title || ""} ${post.frontmatter?.tags?.join(" ") || ""}`).toLowerCase()}>
-          <Card
-            title={post.title}
-            excerpt={post.excerpt || post.content?.slice(0, 180)}
-            tags={post.frontmatter?.tags || []}
-            date={post.frontmatter?.date || post.updated_at}
-            href={`/posts/${post.slug}`}
-          />
-        </div>
-      ))}
+    <div class="browser-layout">
+      <aside class="folder-tree" aria-label="Note folders">
+        <div class="tree-heading">Folders</div>
+        <button class="folder-button active all-posts" data-folder="*"><span>All notes</span><strong>{posts.length}</strong></button>
+        {folders.map((folder) => (
+          <div class="folder-row" style={`--depth: ${folder ? folder.split("/").length - 1 : 0}`}>
+            <button class="folder-button" data-folder={folder} title={folder || "Repository root"}>
+              <span>{folder ? folder.split("/").at(-1) : "Root"}</span><strong>{folderPostCount(folder)}</strong>
+            </button>
+            {folder && <button class="delete-folder" data-delete-folder={folder} data-note-count={folderPostCount(folder)} title={`Move ${folder} to recycle bin`} aria-label={`Move folder ${folder} to recycle bin`}>×</button>}
+          </div>
+        ))}
+      </aside>
+
+      <div class="folder-content">
+        {groups.map((group) => (
+          <section class="folder-section" data-folder={group.folder}>
+            <header class="folder-header">
+              <div class="breadcrumbs"><span>content</span>{group.folder.split("/").filter(Boolean).map((part) => <><i>/</i><span>{part}</span></>)}</div>
+              <span>{group.posts.length} {group.posts.length === 1 ? "note" : "notes"}</span>
+            </header>
+            <div class="posts-grid">
+              {group.posts.map((post) => (
+                <div class="post-item" data-search={`${post.title || ""} ${post.slug} ${(post.frontmatter?.tags || []).join(" ")}`.toLowerCase()}>
+                  <Card title={post.title} excerpt={post.content?.slice(0, 180)} tags={post.frontmatter?.tags || []} date={post.frontmatter?.date} href={postHref(post.slug)} folder={post.folder} />
+                  <button class="delete-note" data-delete-note={post.slug} data-note-title={post.title}>Move to trash</button>
+                </div>
+              ))}
+            </div>
+          </section>
+        ))}
+        <div class="no-results" hidden>No notes match this search.</div>
+      </div>
     </div>
   ) : (
-    <div class="empty-state">
-      <p>No published posts yet.</p>
-      <a href="/new">Create your first post</a>
-    </div>
+    <div class="empty-state"><p>No published notes yet.</p><a href="/new">Create your first note</a></div>
   )}
 </Layout>
 
 <script>
   const searchInput = document.getElementById("search-posts") as HTMLInputElement | null;
-  const items = Array.from(document.querySelectorAll<HTMLElement>(".post-item"));
+  const folderButtons = Array.from(document.querySelectorAll<HTMLButtonElement>(".folder-button"));
+  const sections = Array.from(document.querySelectorAll<HTMLElement>(".folder-section"));
+  const noResults = document.querySelector<HTMLElement>(".no-results");
+  let selectedFolder = "*";
 
-  if (searchInput) {
-    searchInput.addEventListener("input", () => {
-      const query = searchInput.value.trim().toLowerCase();
-
-      items.forEach((item) => {
-        const haystack = (item.getAttribute("data-search") || "").toLowerCase();
-        const matches = !query || haystack.includes(query);
-        item.style.display = matches ? "" : "none";
+  function filterPosts() {
+    const query = searchInput?.value.trim().toLowerCase() || "";
+    let visibleCount = 0;
+    sections.forEach((section) => {
+      const currentFolder = section.dataset.folder || "";
+      const folderMatches = selectedFolder === "*" || currentFolder === selectedFolder || currentFolder.startsWith(`${selectedFolder}/`);
+      let sectionCount = 0;
+      section.querySelectorAll<HTMLElement>(".post-item").forEach((item) => {
+        const matches = folderMatches && (!query || (item.dataset.search || "").includes(query));
+        item.hidden = !matches;
+        if (matches) sectionCount++;
       });
+      section.hidden = sectionCount === 0;
+      visibleCount += sectionCount;
     });
+    if (noResults) noResults.hidden = visibleCount > 0;
   }
+
+  folderButtons.forEach((button) => button.addEventListener("click", () => {
+    selectedFolder = button.dataset.folder ?? "*";
+    folderButtons.forEach((item) => item.classList.toggle("active", item === button));
+    filterPosts();
+  }));
+  searchInput?.addEventListener("input", filterPosts);
+
+  async function responseError(response: Response, fallback: string): Promise<string> {
+    const payload = await response.json().catch(() => ({}));
+    return typeof payload.error === "string" ? payload.error : fallback;
+  }
+
+  document.querySelectorAll<HTMLButtonElement>(".delete-note").forEach((button) => button.addEventListener("click", async () => {
+    const slug = button.dataset.deleteNote || "";
+    const title = button.dataset.noteTitle || slug;
+    if (!slug || !confirm(`Move note "${title}" to the recycle bin?\n\nYou can restore it later from Trash.`)) return;
+    button.disabled = true;
+    button.textContent = "Deleting...";
+    try {
+      const path = slug.split("/").map(encodeURIComponent).join("/");
+      const response = await fetch(`/api/posts/${path}`, { method: "DELETE" });
+      if (!response.ok) throw new Error(await responseError(response, "Could not move note to trash."));
+      window.showToast?.("Note moved to trash", "success");
+      window.location.reload();
+    } catch (error) {
+      window.showToast?.(error instanceof Error ? error.message : "Could not move note to trash.", "error");
+      button.disabled = false;
+      button.textContent = "Move to trash";
+    }
+  }));
+
+  document.querySelectorAll<HTMLButtonElement>(".delete-folder").forEach((button) => button.addEventListener("click", async () => {
+    const folder = button.dataset.deleteFolder || "";
+    const count = button.dataset.noteCount || "0";
+    if (!folder || !confirm(`Move folder "${folder}" to the recycle bin?\n\nAll files and subfolders (${count} published notes) can be restored later. Shared content/assets files are not affected.`)) return;
+    button.disabled = true;
+    button.textContent = "...";
+    try {
+      const response = await fetch("/api/folders", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ folder }) });
+      if (!response.ok) throw new Error(await responseError(response, "Could not move folder to trash."));
+      window.showToast?.("Folder moved to trash", "success");
+      window.location.reload();
+    } catch (error) {
+      window.showToast?.(error instanceof Error ? error.message : "Could not move folder to trash.", "error");
+      button.disabled = false;
+      button.textContent = "×";
+    }
+  }));
 </script>
 
 <style>
-  .posts-header {
-    margin-top: 2.5rem;
-    margin-bottom: 3.5rem;
-  }
-
-  .posts-header h1 {
-    font-size: 2rem;
-    margin-bottom: 1rem;
-  }
-
-  .search-input {
-    width: 100%;
-    max-width: 400px;
-    padding: 0.75rem 1rem;
-    border: 2px solid var(--border);
-    border-radius: 8px;
-    font-size: 1rem;
-    background: var(--surface);
-    color: var(--foreground);
-  }
-
-  .search-input:focus {
-    outline: none;
-    border-color: var(--accent-1);
-  }
-
-  .posts-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 2.5rem;
-    margin-top: 0;
-  }
-
-  .empty-state {
-    text-align: center;
-    min-height: 280px;
-    padding: 5rem 2rem;
-    background: var(--surface-strong);
-    border: 2px dashed var(--border);
-    border-radius: 12px;
-    color: var(--darkgray);
-  }
-
-  .empty-state p {
-    font-size: 1.1rem;
-    margin-bottom: 1rem;
-  }
-
-  .empty-state a {
-    display: inline-block;
-    background: var(--accent-1);
-    color: white;
-    padding: 0.75rem 1.5rem;
-    border-radius: 8px;
-    text-decoration: none;
-  }
-
-  @media (max-width: 768px) {
-    .search-input {
-      max-width: 100%;
-    }
-
-    .posts-grid {
-      grid-template-columns: 1fr;
-    }
-  }
+  .posts-header { margin: 2.5rem 0 2rem; display: flex; align-items: end; justify-content: space-between; gap: 2rem; }
+  .posts-header h1 { font-size: 2rem; margin: 0; }
+  .eyebrow { margin: 0 0 .35rem; color: var(--accent-1); font: 700 .72rem var(--font-mono); letter-spacing: .12em; text-transform: uppercase; }
+  .search-input { width: min(420px, 100%); padding: .75rem 1rem; border: 2px solid var(--border); border-radius: 8px; font-size: 1rem; background: var(--surface); color: var(--foreground); }
+  .search-input:focus { outline: none; border-color: var(--accent-1); }
+  .browser-layout { display: grid; grid-template-columns: 245px minmax(0, 1fr); gap: 2rem; align-items: start; }
+  .folder-tree { position: sticky; top: 100px; padding: .8rem; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
+  .tree-heading { padding: .45rem .65rem .8rem; font: 700 .75rem var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--gray); }
+  .folder-row { display: flex; align-items: center; gap: .2rem; padding-left: calc(var(--depth, 0) * .75rem); }
+  .folder-button { min-width: 0; flex: 1; display: flex; align-items: center; justify-content: space-between; gap: .6rem; padding: .65rem .7rem; border: 0; border-radius: 8px; background: transparent; color: var(--foreground); text-align: left; }
+  .folder-button.all-posts { width: 100%; }
+  .folder-button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .folder-button strong { min-width: 1.7rem; padding: .1rem .35rem; border-radius: 999px; background: var(--surface-strong); font-size: .72rem; text-align: center; }
+  .folder-button:hover, .folder-button.active { color: var(--accent-1); background: rgba(201, 110, 77, .12); }
+  .delete-folder { flex: 0 0 1.8rem; width: 1.8rem; height: 1.8rem; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--gray); font-size: 1rem; }
+  .delete-folder:hover { background: rgba(255, 0, 80, .14); color: #d60045; }
+  .folder-content { min-width: 0; }
+  .folder-section { margin-bottom: 3rem; }
+  .folder-header { display: flex; justify-content: space-between; gap: 1rem; align-items: center; margin-bottom: 1rem; color: var(--gray); font-size: .82rem; }
+  .breadcrumbs { display: flex; gap: .45rem; align-items: center; overflow: hidden; font-family: var(--font-mono); color: var(--foreground); }
+  .breadcrumbs i { color: var(--gray); font-style: normal; }
+  .posts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(285px, 1fr)); gap: 1.5rem; }
+  .post-item { display: flex; flex-direction: column; gap: .55rem; }
+  .post-item :global(.card) { width: 100%; }
+  .delete-note { align-self: flex-end; padding: .35rem .6rem; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--gray); font: 600 .75rem var(--font-body); }
+  .delete-note:hover { border-color: #d60045; color: #d60045; background: rgba(255, 0, 80, .08); }
+  .delete-note:disabled, .delete-folder:disabled { opacity: .55; cursor: wait; }
+  .no-results, .empty-state { text-align: center; min-height: 220px; padding: 4rem 2rem; background: var(--surface-strong); border: 2px dashed var(--border); border-radius: 12px; color: var(--darkgray); }
+  .empty-state a { display: inline-block; background: var(--accent-1); color: white; padding: .75rem 1.5rem; border-radius: 8px; text-decoration: none; }
+  @media (max-width: 800px) { .posts-header { align-items: stretch; flex-direction: column; } .search-input { width: 100%; } .browser-layout { grid-template-columns: 1fr; } .folder-tree { position: static; display: flex; overflow-x: auto; } .tree-heading { display: none; } .folder-row { flex: 0 0 auto; padding-left: 0; } .folder-button { padding: .65rem .8rem; } .posts-grid { grid-template-columns: 1fr; } }
 </style>

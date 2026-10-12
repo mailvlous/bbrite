@@ -18,6 +18,7 @@ const { title = "Bbrite", showNav = true, currentPage } = Astro.props;
       <nav class="header-nav" aria-label="Main navigation">
         <a href="/posts" class:list={["nav-link", { active: currentPage === "posts" }]}>Posts</a>
         <a href="/drafts" class:list={["nav-link", { active: currentPage === "drafts" }]}>Drafts</a>
+        <a href="/trash" class:list={["nav-link", { active: currentPage === "trash" }]}>Trash</a>
         <a href="/new" class:list={["nav-link primary", { active: currentPage === "new" }]}>New</a>
       </nav>
     )}

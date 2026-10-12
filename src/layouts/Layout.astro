@@ -14,7 +14,7 @@ const { title = "Bbrite", currentPage = "", class: className = "" } = Astro.prop
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=DM+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=DM+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Sans+3:wght@400;600;700&display=swap"
       rel="stylesheet"
     />
     <style is:global>
@@ -197,9 +197,18 @@ const { title = "Bbrite", currentPage = "", class: className = "" } = Astro.prop
         padding: 0 2rem 4rem 2rem;
       }
 
+      .main-content.editor-layout {
+        width: min(1680px, 92vw);
+        max-width: none;
+      }
+
       @media (max-width: 768px) {
         .main-content {
           padding: 0 1rem 2rem 1rem;
+        }
+
+        .main-content.editor-layout {
+          width: 100%;
         }
       }
     </style>

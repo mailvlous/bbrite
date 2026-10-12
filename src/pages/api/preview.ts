@@ -14,7 +14,11 @@ export const POST: APIRoute = async ({ request, locals }) => {
       );
     }
 
-    const { html, excerpt } = await renderMarkdown(content);
+    const rendered = await renderMarkdown(content);
+    const html = rendered.html
+      .replace(/src="\/assets\//g, 'src="/api/assets/')
+      .replace(/href="\/assets\//g, 'href="/api/assets/');
+    const { excerpt } = rendered;
 
     return new Response(
       JSON.stringify({ html, excerpt }),
