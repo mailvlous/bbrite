@@ -1,4 +1,5 @@
 import { marked, Renderer } from "marked";
+import markedKatex from "marked-katex-extension";
 
 export interface MarkdownResult {
   html: string;
@@ -21,6 +22,8 @@ function safeUrl(value: string): string | null {
 }
 
 const renderer = new Renderer();
+
+marked.use(markedKatex({ throwOnError: false }));
 
 renderer.html = ({ text }) => escapeHtml(text);
 renderer.link = function ({ href, title, tokens }) {

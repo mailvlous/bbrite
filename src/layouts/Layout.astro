@@ -1,6 +1,7 @@
 ---
 import BriteHeader from "../components/BriteHeader.astro";
 import Toast from "../components/Toast.astro";
+import "katex/dist/katex.min.css";
 
 const { title = "Bbrite", currentPage = "", class: className = "" } = Astro.props;
 ---
@@ -128,6 +129,13 @@ const { title = "Bbrite", currentPage = "", class: className = "" } = Astro.prop
         margin-left: 0;
         color: var(--darkgray);
         font-style: italic;
+      }
+
+      .katex-display {
+        max-width: 100%;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding: 0.5rem 0;
       }
 
       button, input, textarea, select {
